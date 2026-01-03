@@ -46,7 +46,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/btcdage2011/DageChat/dagechat.git
+git clone https://github.com/btcdage2011/DageChat.git
 cd dagechat
 
 # 创建虚拟环境 (推荐)
@@ -90,3 +90,4 @@ DbPath=D:\MySecureData
 
 **Author**: @BTCDage (技术交流)
 **License**: MIT (仅限技术研究)
+
