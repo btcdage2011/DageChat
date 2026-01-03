@@ -2,7 +2,7 @@
 """
 -------------------------------------------------
 Project:   DageChat (Nostr Protocol Client Research)
-Author:    @BTCDage 
+Author:    @BTCDage
 Nostr:     npub17ahz4xa3hvkvvhh4wguzzqknp8p7l5nyzzqc3z53uq538r5qgn0q40z7pw
 License:   MIT License
 Source:    https://github.com/btcdage2011/DageChat
@@ -1056,5 +1056,4 @@ class PersistentChatUser:
         else:
             tags.append(['p', msg[1]])
         self._send_event(5, 'recall', tags)
-
         self.db.update_message_content(tid, tr('MSG_RECALLED'))

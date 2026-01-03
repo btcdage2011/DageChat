@@ -2,7 +2,7 @@
 """
 -------------------------------------------------
 Project:   DageChat (Nostr Protocol Client Research)
-Author:    @BTCDage 
+Author:    @BTCDage
 Nostr:     npub17ahz4xa3hvkvvhh4wguzzqknp8p7l5nyzzqc3z53uq538r5qgn0q40z7pw
 License:   MIT License
 Source:    https://github.com/btcdage2011/DageChat
@@ -40,6 +40,4 @@ class GuiChatUser(PersistentChatUser):
         super()._handle_deletion(event)
         target_ids = [t[1] for t in event.get('tags', []) if t[0] == 'e']
         if target_ids:
-
             self._print_to_ui('delete', {'ids': target_ids})
-

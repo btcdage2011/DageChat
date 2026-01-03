@@ -2,7 +2,7 @@
 """
 -------------------------------------------------
 Project:   DageChat (Nostr Protocol Client Research)
-Author:    @BTCDage 
+Author:    @BTCDage
 Nostr:     npub17ahz4xa3hvkvvhh4wguzzqknp8p7l5nyzzqc3z53uq538r5qgn0q40z7pw
 License:   MIT License
 Source:    https://github.com/btcdage2011/DageChat
@@ -699,5 +699,4 @@ class DageDB:
                 print(f'❌ [DB] Batch delete messages error: {e}')
                 return 0
             finally:
-
                 cursor.close()
