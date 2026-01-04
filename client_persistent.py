@@ -17,7 +17,7 @@ Disclaimer / 免责声明:
    严禁将本软件用于任何违反当地法律法规的用途。
 -------------------------------------------------
 """
-
+ 
 import json
 import time
 import threading
@@ -1096,3 +1096,4 @@ class PersistentChatUser:
             tags.append(['p', msg[1]])
         self._send_event(5, 'recall', tags)
         self.db.update_message_content(tid, tr('MSG_RECALLED'))
+
