@@ -1091,11 +1091,12 @@ class ChatApp(ctk.CTk):
         self.input_area.pack(fill='x', padx=10, pady=10)
         self.msg_entry = ctk.CTkTextbox(self.input_area, height=80, fg_color='#343638', text_color='#fff', font=('Microsoft YaHei UI', 14))
         self.msg_entry.pack(side='left', fill='x', expand=True, padx=(10, 10), pady=8)
-        self.msg_entry.bind('<Control-Return>', self.send_message)
+        self.msg_entry.bind('<Return>', self._on_enter_key)
+        self.msg_entry.bind('<Control-Return>', self._on_ctrl_enter_key)
         self.msg_entry.bind('<KeyRelease>', self._on_input_key_release)
         self.msg_entry.bind('<Button-1>', self._on_input_click)
         self.bind_all('<Control-v>', self.on_paste)
-        btn_text = f"{tr('BTN_SEND')} (Ctrl+Enter)"
+        btn_text = f"{tr('BTN_SEND')} (Enter)"
         self.send_btn = ctk.CTkButton(self.input_area, text=btn_text, width=80, height=40, command=self.send_message)
         self.send_btn.pack(side='right', padx=(0, 10), pady=15)
         self.ui_is_ready = True
@@ -1225,6 +1226,14 @@ class ChatApp(ctk.CTk):
             time.sleep(0.1)
         self.show_toast(f'已转发 {len(messages_data)} 条消息')
         self._toggle_multi_select_mode(False)
+
+    def _on_enter_key(self, event):
+        self.send_message()
+        return 'break'
+
+    def _on_ctrl_enter_key(self, event):
+        self.msg_entry.insert('insert', '\n')
+        return 'break'
 
     def _on_input_key_release(self, event):
         if self.current_chat_type != 'group':
@@ -2988,7 +2997,7 @@ class ChatApp(ctk.CTk):
         def _restore():
             if not self.winfo_exists():
                 return
-            btn_text = f"{tr('BTN_SEND')} (Ctrl+Enter)"
+            btn_text = f"{tr('BTN_SEND')} (Enter)"
             self.send_btn.configure(state='normal', text=btn_text)
             if hasattr(self, 'btn_emoji'):
                 self.btn_emoji.configure(state='normal')
