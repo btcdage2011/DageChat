@@ -33,6 +33,7 @@ from db import DageDB
 from key_utils import get_npub_abbr
 from nostr_crypto import NostrCrypto
 from lang_utils import tr
+import urllib.request
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 OFFICIAL_GROUP_CONFIG = {'id': 'feb75fb664b41f95', 'key': '0f01f4613e3f194bdcf5a0863e46bde7297df2304865ec2df9e48ade53ae6dbc', 'name': 'DageChat 测试频道', 'owner': 'f76e2a9bb1bb2cc65ef572382102d309c3efd2641081888a91e029138e8044de'}
@@ -83,7 +84,31 @@ class AsyncRelayWorker:
         self.ping_start = 0
 
     async def connect_loop(self, session):
-        proxy_url = CONF['client'].get('proxy')
+        manual_proxy = CONF['client'].get('proxy')
+        proxy_url = manual_proxy
+        is_bypass = False
+        try:
+            parsed = urllib.parse.urlparse(self.url)
+            hostname = parsed.hostname
+        except:
+            hostname = ''
+        if not proxy_url:
+            try:
+                if hostname and urllib.request.proxy_bypass(hostname):
+                    is_bypass = True
+                if not is_bypass:
+                    system_proxies = urllib.request.getproxies()
+                    if 'https' in system_proxies:
+                        proxy_url = system_proxies['https']
+                    elif 'http' in system_proxies:
+                        proxy_url = system_proxies['http']
+                    if proxy_url and (not hasattr(self, '_logged_auto_proxy')):
+                        print(f'🌐 [Net] auto_proxy: {proxy_url}')
+                        self._logged_auto_proxy = True
+            except Exception as e:
+                print(f'⚠️ [Net] proxy检测出错: {e}')
+        if is_bypass:
+            proxy_url = None
         verify_ssl = CONF['client'].get('verify_ssl', True)
         ssl_ctx = None
         if not verify_ssl:
@@ -114,7 +139,10 @@ class AsyncRelayWorker:
                     err_info += f' (Proxy: {proxy_url})'
                 print(f'⚠️ [Net] 连接失败 [{self.url}]: {err_info}')
             except aiohttp.WSServerHandshakeError as e:
-                print(f'⚠️ [Net] 握手失败 [{self.url}]: Status {e.status}')
+                msg = f'Status {e.status}'
+                if e.status == 200 and proxy_url:
+                    msg += ' (可能是代理服务器不支持 WebSocket 转发，请尝试关闭代理或将此 IP 加入系统不代理列表)'
+                print(f'⚠️ [Net] 握手失败 [{self.url}]: {msg}')
             except Exception as e:
                 import traceback
                 print(f'❌ 连接异常崩溃 [{self.url}]: {e}')
@@ -337,6 +365,16 @@ class PersistentChatUser:
         print(f'🏛️ [System] 正在连接测试频道: {gid}...')
         self.db.save_group(gid, OFFICIAL_GROUP_CONFIG['name'], OFFICIAL_GROUP_CONFIG['key'], owner_pubkey=OFFICIAL_GROUP_CONFIG['owner'], group_type=0)
         self.groups[gid] = {'name': OFFICIAL_GROUP_CONFIG['name'], 'key_hex': OFFICIAL_GROUP_CONFIG['key'], 'type': 0}
+
+    def change_password(self, old_password, new_password):
+        if not self.verify_password(old_password):
+            return (False, tr('DIALOG_AUTH_ERR_PWD'))
+        try:
+            self._encrypt_and_save(self.pk, self.priv_k, new_password)
+            return (True, 'Success')
+        except Exception as e:
+            print(f'Change password error: {e}')
+            return (False, str(e))
 
     def on_message(self, worker, message_str):
         try:
