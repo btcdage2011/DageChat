@@ -51,7 +51,7 @@ if False:
     import gui_viewer
     import nacl
     import coincurve
-APP_VERSION = 'v0.5.4'
+APP_VERSION = 'v0.5.5'
 APP_BUILD_NAME = f'DageChat Beta {APP_VERSION}'
 APP_AUMID = f'DageTech.DageChat.Client.{APP_VERSION}'
 
@@ -1544,7 +1544,10 @@ class ChatApp(ctk.CTk):
             elif mode == 'IMPORT':
                 success, msg = self.client.import_account(priv_key, nickname, password)
             if not success:
-                messagebox.showerror('验证失败', msg)
+                if self.login_window and self.login_window.winfo_exists():
+                    self.show_toast(f'❌ {msg}', duration=2500, master=self.login_window)
+                else:
+                    messagebox.showerror('验证失败', msg)
                 return
             target_geometry = None
             if self.login_window and self.login_window.winfo_exists():
@@ -2050,6 +2053,7 @@ class ChatApp(ctk.CTk):
         menu.add_separator()
         menu.add_command(label=tr('MENU_SEARCH_CHAT'), command=self.search_current_chat)
         menu.add_command(label=tr('MENU_EXPORT_CHAT'), command=self.export_current_chat)
+        menu.add_command(label='📦 备份此会话 (.dgbk)', command=self.backup_current_chat)
         menu.add_separator()
         menu.add_command(label=tr('MENU_CLEAR_LOCAL'), command=lambda: self.clear_chat_history(self.current_chat_id))
         try:
@@ -2058,6 +2062,21 @@ class ChatApp(ctk.CTk):
             menu.tk_popup(x, y)
         finally:
             menu.grab_release()
+
+    def backup_current_chat(self):
+        if not self.current_chat_id:
+            return
+        from datetime import datetime
+        name = self.chat_title.cget('text').split(' ')[-1]
+        safe_name = ''.join([c for c in name if c.isalnum()])
+        default_name = f"ChatBackup_{safe_name}_{datetime.now().strftime('%Y%m%d')}.dgbk"
+        path = ctk.filedialog.asksaveasfilename(parent=self, defaultextension='.dgbk', initialfile=default_name, title='Backup Session')
+        if not path:
+            return
+        from backup_manager import BackupManager
+        from gui_windows import TaskProgressWindow
+        manager = BackupManager(self.client)
+        TaskProgressWindow(self, tr('BKP_TITLE'), BackupManager.run_backup, manager, path, self.current_chat_id, toast_master=self)
 
     def clear_chat_history(self, sid, name_for_prompt='Chat'):
         if messagebox.askyesno(tr('DIALOG_CLEAR_TITLE'), tr('DIALOG_CLEAR_MSG').format(name=name_for_prompt)):

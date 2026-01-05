@@ -17,7 +17,7 @@ Disclaimer / 免责声明:
    严禁将本软件用于任何违反当地法律法规的用途。
 -------------------------------------------------
 """
- 
+
 import json
 import time
 import threading
@@ -39,37 +39,7 @@ if sys.platform == 'win32':
 OFFICIAL_GROUP_CONFIG = {'id': 'feb75fb664b41f95', 'key': '0f01f4613e3f194bdcf5a0863e46bde7297df2304865ec2df9e48ade53ae6dbc', 'name': 'DageChat 测试频道', 'owner': 'f76e2a9bb1bb2cc65ef572382102d309c3efd2641081888a91e029138e8044de'}
 OFFICIAL_GROUP_POW_DIFFICULTY = 16
 NORMAL_GROUP_POW_DIFFICULTY = 8
-
-def load_config():
-    if getattr(sys, 'frozen', False):
-        application_path = os.path.dirname(sys.executable)
-    else:
-        application_path = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(application_path, 'relays.json')
-    default_config = {'client': {'relay_url': ['ws://localhost:3008', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.snort.social'], 'reconnect_delay': 5, 'proxy': None, 'verify_ssl': True}}
-    try:
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if not content:
-                    print(f'⚠️ [Client] 配置文件为空，将使用默认设置')
-                    user_config = {}
-                else:
-                    user_config = json.loads(content)
-            if 'client' in user_config:
-                default_config['client'].update(user_config['client'])
-                url_val = default_config['client']['relay_url']
-                if isinstance(url_val, str):
-                    default_config['client']['relay_url'] = [url_val]
-            print(f'✅ [Client] 已加载配置文件: {config_path}')
-        else:
-            print(f'ℹ️ [Client] 未找到配置文件，使用默认设置')
-    except json.JSONDecodeError:
-        print(f'⚠️ [Client] 配置文件格式损坏，已忽略，将使用默认设置')
-    except Exception as e:
-        print(f'❌ [Client] 配置文件读取错误: {e}')
-    return default_config
-CONF = load_config()
+DEFAULT_RELAYS = ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.snort.social']
 
 class AsyncRelayWorker:
 
@@ -80,49 +50,105 @@ class AsyncRelayWorker:
         self.status = 0
         self.latency = -1
         self.should_exit = False
-        self.reconnect_delay = CONF['client'].get('reconnect_delay', 5)
+        self.reconnect_delay = 5
         self.ping_start = 0
+        self._logged_auto_proxy = False
+        self._logged_disabled_hint = False
 
     async def connect_loop(self, session):
-        manual_proxy = CONF['client'].get('proxy')
-        proxy_url = manual_proxy
-        is_bypass = False
-        try:
-            parsed = urllib.parse.urlparse(self.url)
-            hostname = parsed.hostname
-        except:
-            hostname = ''
-        if not proxy_url:
-            try:
-                if hostname and urllib.request.proxy_bypass(hostname):
-                    is_bypass = True
-                if not is_bypass:
-                    system_proxies = urllib.request.getproxies()
-                    if 'https' in system_proxies:
-                        proxy_url = system_proxies['https']
-                    elif 'http' in system_proxies:
-                        proxy_url = system_proxies['http']
-                    if proxy_url and (not hasattr(self, '_logged_auto_proxy')):
-                        print(f'🌐 [Net] auto_proxy: {proxy_url}')
-                        self._logged_auto_proxy = True
-            except Exception as e:
-                print(f'⚠️ [Net] proxy检测出错: {e}')
-        if is_bypass:
-            proxy_url = None
-        verify_ssl = CONF['client'].get('verify_ssl', True)
+        print(f'🔧 [Worker] Starting loop for: {self.url}')
+        verify_ssl = True
         ssl_ctx = None
         if not verify_ssl:
             import ssl
             ssl_ctx = ssl.create_default_context()
             ssl_ctx.check_hostname = False
             ssl_ctx.verify_mode = ssl.CERT_NONE
+        import urllib.request
+        import urllib.parse
         while not self.should_exit:
+            proxy_url = None
+            is_bypass = False
+            is_disabled = False
+            target_hostname = ''
+            try:
+                parsed = urllib.parse.urlparse(self.url)
+                target_hostname = parsed.hostname or ''
+            except:
+                pass
+            try:
+                if self.manager and self.manager.user_obj:
+                    if hasattr(self.manager.user_obj, 'network_config'):
+                        cfg = self.manager.user_obj.network_config
+                        val = cfg.get('proxy_disabled', False)
+                        is_disabled = str(val) == '1' or val is True
+                        bypass_list = cfg.get('proxy_bypass', [])
+                        if isinstance(bypass_list, str):
+                            bypass_list = [x.strip() for x in bypass_list.replace(';', ',').split(',') if x.strip()]
+                        if bypass_list and target_hostname:
+                            for rule in bypass_list:
+                                rule = rule.strip()
+                                if not rule:
+                                    continue
+                                rule_host = rule
+                                if '://' in rule:
+                                    try:
+                                        r_parsed = urllib.parse.urlparse(rule)
+                                        if r_parsed.hostname:
+                                            rule_host = r_parsed.hostname
+                                    except:
+                                        pass
+                                elif ':' in rule:
+                                    rule_host = rule.split(':')[0]
+                                if target_hostname == rule_host or target_hostname.endswith(rule_host):
+                                    is_bypass = True
+                                    if not self._logged_auto_proxy:
+                                        print(f'🛡️ [Net] Bypass Rule Matched: {rule} -> {target_hostname}')
+                                    break
+                    elif hasattr(self.manager.user_obj, 'db'):
+                        val = self.manager.user_obj.db.get_setting('proxy_disabled')
+                        is_disabled = val == '1'
+            except Exception as e:
+                print(f'❌ [Worker] Config check error: {e}')
+            if is_disabled:
+                proxy_url = None
+                if not self._logged_disabled_hint:
+                    print(tr('LOG_PROXY_DISABLED'))
+                    self._logged_disabled_hint = True
+                    self._logged_auto_proxy = False
+            elif is_bypass:
+                proxy_url = None
+            else:
+                self._logged_disabled_hint = False
+                try:
+                    if self.manager and self.manager.user_obj:
+                        if hasattr(self.manager.user_obj, 'network_config'):
+                            proxy_url = self.manager.user_obj.network_config.get('proxy_url', '')
+                        elif hasattr(self.manager.user_obj, 'db'):
+                            proxy_url = self.manager.user_obj.db.get_setting('proxy_url')
+                except:
+                    pass
+                if not proxy_url:
+                    try:
+                        if target_hostname and urllib.request.proxy_bypass(target_hostname):
+                            proxy_url = None
+                        else:
+                            system_proxies = urllib.request.getproxies()
+                            if 'https' in system_proxies:
+                                proxy_url = system_proxies['https']
+                            elif 'http' in system_proxies:
+                                proxy_url = system_proxies['http']
+                            if proxy_url and (not self._logged_auto_proxy):
+                                print(tr('LOG_AUTO_PROXY').format(url=proxy_url))
+                                self._logged_auto_proxy = True
+                    except Exception as e:
+                        pass
             self._update_status(1)
             try:
                 async with session.ws_connect(self.url, heartbeat=30, proxy=proxy_url, ssl=ssl_ctx if self.url.startswith('wss://') else None) as ws:
                     self.ws = ws
                     self._update_status(2)
-                    print(f'✅ [Net] 已连接: {self.url}')
+                    print(tr('LOG_CONNECTED').format(url=self.url))
                     self.manager._on_relay_connected(self)
                     self.ping_start = time.time()
                     await self.send_str(json.dumps(['REQ', 'PING_TEST', {'limit': 0}]))
@@ -137,16 +163,15 @@ class AsyncRelayWorker:
                 err_info = str(e)
                 if proxy_url:
                     err_info += f' (Proxy: {proxy_url})'
-                print(f'⚠️ [Net] 连接失败 [{self.url}]: {err_info}')
+                print(tr('LOG_CONNECT_FAIL').format(url=self.url, info=err_info))
             except aiohttp.WSServerHandshakeError as e:
                 msg = f'Status {e.status}'
                 if e.status == 200 and proxy_url:
-                    msg += ' (可能是代理服务器不支持 WebSocket 转发，请尝试关闭代理或将此 IP 加入系统不代理列表)'
-                print(f'⚠️ [Net] 握手失败 [{self.url}]: {msg}')
+                    msg += tr('ERR_PROXY_NO_WS')
+                print(tr('LOG_HANDSHAKE_FAIL').format(url=self.url, msg=msg))
             except Exception as e:
                 import traceback
-                print(f'❌ 连接异常崩溃 [{self.url}]: {e}')
-                traceback.print_exc()
+                print(tr('LOG_CONNECT_CRASH').format(url=self.url, e=e))
             finally:
                 self.ws = None
                 self._update_status(0)
@@ -163,7 +188,7 @@ class AsyncRelayWorker:
             try:
                 self.manager.on_message_callback(self, data)
             except Exception as e:
-                print(f'❌ 消息处理回调异常: {e}')
+                print(f'❌ 消息回调异常: {e}')
 
     async def send_str(self, data):
         if self.ws and (not self.ws.closed):
@@ -202,14 +227,14 @@ class AsyncRelayWorker:
 
 class AsyncRelayManager:
 
-    def __init__(self, relay_urls, on_message_callback, user_obj):
-        self.relay_urls = relay_urls
+    def __init__(self, on_message_callback, user_obj):
         self.on_message_callback = on_message_callback
         self.user_obj = user_obj
         self.workers = {}
         self.loop = None
         self.thread = None
         self.workers_lock = threading.Lock()
+        self._pending_urls = set()
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -223,24 +248,23 @@ class AsyncRelayManager:
         self.thread.start()
 
     async def _main_task(self):
-        async with aiohttp.ClientSession() as session:
-            tasks = []
-            for url in self.relay_urls:
-                if url not in self.workers:
-                    worker = AsyncRelayWorker(url, self)
-                    self.workers[url] = worker
-                    tasks.append(asyncio.create_task(worker.connect_loop(session)))
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
-            while True:
-                await asyncio.sleep(1)
+        while True:
+            if self._pending_urls:
+                urls_to_add = list(self._pending_urls)
+                self._pending_urls.clear()
+                for url in urls_to_add:
+                    if url not in self.workers:
+                        await self._add_relay_coro(url)
+            await asyncio.sleep(1)
 
     def add_relay_dynamic(self, url):
         clean_url = url.strip()
         if not clean_url:
             return
-        if self.loop:
+        if self.loop and self.loop.is_running():
             asyncio.run_coroutine_threadsafe(self._add_relay_coro(clean_url), self.loop)
+        else:
+            self._pending_urls.add(clean_url)
 
     async def _add_relay_coro(self, url):
         if url in self.workers:
@@ -249,7 +273,7 @@ class AsyncRelayManager:
         self.workers[url] = worker
 
         async def _independent_worker_run():
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(trust_env=False) as session:
                 await worker.connect_loop(session)
         asyncio.create_task(_independent_worker_run())
 
@@ -280,6 +304,9 @@ class AsyncRelayManager:
             if w.status == 2:
                 connected_count += 1
             details.append({'url': url, 'status': w.status})
+        for url in self._pending_urls:
+            if url not in self.workers:
+                details.append({'url': url, 'status': 0})
         return {'total': len(details), 'connected': connected_count, 'details': details}
 
 class PersistentChatUser:
@@ -287,8 +314,38 @@ class PersistentChatUser:
     def __init__(self, db_filename, nickname=None):
         self.db = DageDB(db_filename)
         self.lock = threading.Lock()
-        relay_urls = list(set(CONF['client']['relay_url']))
-        self.relay_manager = AsyncRelayManager(relay_urls, self.on_message, self)
+        import os
+        db_folder = os.path.dirname(os.path.abspath(db_filename))
+        self.config_file = os.path.join(db_folder, 'relays.json')
+        self.network_config = {'relays': list(DEFAULT_RELAYS), 'proxy_url': '', 'proxy_disabled': False, 'proxy_bypass': []}
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        data = json.loads(content)
+                        if isinstance(data, list):
+                            self.network_config['relays'] = list(set(data))
+                            self._save_config_to_disk()
+                        elif isinstance(data, dict):
+                            if 'relays' in data:
+                                self.network_config['relays'] = list(set(data['relays']))
+                            if 'proxy_url' in data:
+                                self.network_config['proxy_url'] = data['proxy_url']
+                            if 'proxy_disabled' in data:
+                                self.network_config['proxy_disabled'] = data['proxy_disabled']
+                            raw_bypass = data.get('proxy_bypass', [])
+                            if isinstance(raw_bypass, str):
+                                self.network_config['proxy_bypass'] = [x.strip() for x in raw_bypass.replace(';', ',').split(',') if x.strip()]
+                                self._save_config_to_disk()
+                            else:
+                                self.network_config['proxy_bypass'] = raw_bypass
+            else:
+                self._save_config_to_disk()
+        except Exception as e:
+            print(f'❌ [Config] Load error: {e}, using defaults.')
+        print(f"✅ [System] Config loaded (JSON Mode). Relays: {len(self.network_config['relays'])}")
+        self.relay_manager = AsyncRelayManager(self.on_message, self)
         self.groups = {}
         from collections import deque
         self.my_ghost_nonces = deque(maxlen=50)
@@ -299,19 +356,141 @@ class PersistentChatUser:
         self.enc_pk = None
         self.on_relay_status_callback = None
 
+    def _save_config_to_disk(self):
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.network_config, f, indent=4)
+            return True
+        except Exception as e:
+            print(f'❌ Write config error: {e}')
+            return False
+
+    def connect(self):
+        print(f'🚀 [System] Starting Network Layer (JSON Mode)...')
+        self.relay_manager.start()
+        print(f"🔄 [System] Injecting {len(self.network_config['relays'])} relays...")
+        for url in self.network_config['relays']:
+            self.relay_manager.add_relay_dynamic(url)
+
+    def add_relay_persistent(self, url):
+        clean_url = url.strip()
+        if not clean_url:
+            return False
+        self.relay_manager.add_relay_dynamic(clean_url)
+        current_list = self.network_config['relays']
+        if clean_url not in current_list:
+            current_list.append(clean_url)
+            self.network_config['relays'] = current_list
+            self._save_config_to_disk()
+            print(f'💾 [File] Relay added: {clean_url}')
+            return True
+        return True
+
+    def remove_relay_persistent(self, url):
+        with self.lock:
+            if url in self.relay_manager.workers:
+                worker = self.relay_manager.workers[url]
+                worker.stop()
+                del self.relay_manager.workers[url]
+            if hasattr(self.relay_manager, '_pending_urls') and url in self.relay_manager._pending_urls:
+                self.relay_manager._pending_urls.remove(url)
+        current_list = self.network_config['relays']
+        if url in current_list:
+            current_list.remove(url)
+            self.network_config['relays'] = current_list
+            self._save_config_to_disk()
+            print(f'🗑️ [File] Relay removed: {url}')
+            return True
+        return False
+
+    def save_proxy_settings(self, proxy_url, is_disabled, bypass_str):
+        self.network_config['proxy_url'] = proxy_url.strip()
+        self.network_config['proxy_disabled'] = bool(is_disabled)
+        bypass_list = [x.strip() for x in bypass_str.replace(';', ',').split(',') if x.strip()]
+        self.network_config['proxy_bypass'] = bypass_list
+        if self._save_config_to_disk():
+            print(f'💾 [File] Proxy settings updated.')
+            return True
+        return False
+
+    def add_bypass_rule(self, rule):
+        clean_rule = rule.strip()
+        if not clean_rule:
+            return False
+        current_list = self.network_config.get('proxy_bypass', [])
+        if clean_rule not in current_list:
+            current_list.append(clean_rule)
+            self.network_config['proxy_bypass'] = current_list
+            self._save_config_to_disk()
+            return True
+        return True
+
+    def remove_bypass_rule(self, rule):
+        current_list = self.network_config.get('proxy_bypass', [])
+        if rule in current_list:
+            current_list.remove(rule)
+            self.network_config['proxy_bypass'] = current_list
+            self._save_config_to_disk()
+            return True
+        return False
+
+    def reconnect_all_relays(self):
+        print('🔄 [System] Restarting all relays...')
+        with self.lock:
+            current_urls = list(self.relay_manager.workers.keys())
+            for url in current_urls:
+                worker = self.relay_manager.workers[url]
+                worker.stop()
+                del self.relay_manager.workers[url]
+        time.sleep(0.5)
+        for url in current_urls:
+            self.relay_manager.add_relay_dynamic(url)
+
+    def reset_network_settings(self):
+        with self.lock:
+            current_urls = list(self.relay_manager.workers.keys())
+            for url in current_urls:
+                worker = self.relay_manager.workers[url]
+                worker.stop()
+                del self.relay_manager.workers[url]
+            if hasattr(self.relay_manager, '_pending_urls'):
+                self.relay_manager._pending_urls.clear()
+        self.network_config = {'relays': list(DEFAULT_RELAYS), 'proxy_url': '', 'proxy_disabled': False, 'proxy_bypass': []}
+        self._save_config_to_disk()
+        for url in DEFAULT_RELAYS:
+            self.relay_manager.add_relay_dynamic(url)
+        print('✅ [System] Network settings reset (JSON Mode).')
+        return True
+
     @property
     def relays(self):
         return self.relay_manager.workers
 
     def connect(self):
-        print(f'🚀 [系统] 启动 Nostr 网络层 (Standard Mode)...')
+        print(f'🚀 [System] Starting Network Layer (JSON Mode)...')
         self.relay_manager.start()
+        relays = self.network_config.get('relays', [])
+        print(f'🔄 [System] Injecting {len(relays)} relays...')
+        for url in relays:
+            self.relay_manager.add_relay_dynamic(url)
 
     def add_relay_dynamic(self, url):
         self.relay_manager.add_relay_dynamic(url)
 
     def get_connection_status(self):
-        return self.relay_manager.get_status_snapshot()
+        mgr_snapshot = self.relay_manager.get_status_snapshot()
+        active_status_map = {item['url']: item['status'] for item in mgr_snapshot.get('details', [])}
+        config_urls = self.network_config.get('relays', [])
+        all_urls = set(config_urls) | set(active_status_map.keys())
+        final_details = []
+        connected_count = 0
+        for url in all_urls:
+            status = active_status_map.get(url, 0)
+            if status == 2:
+                connected_count += 1
+            final_details.append({'url': url, 'status': status})
+        final_details.sort(key=lambda x: x['url'])
+        return {'total': len(final_details), 'connected': connected_count, 'details': final_details}
 
     def _do_subscriptions_for_worker(self, worker):
 
@@ -322,6 +501,8 @@ class PersistentChatUser:
             except RuntimeError:
                 if self.relay_manager.loop:
                     asyncio.run_coroutine_threadsafe(worker.send_str(msg), self.relay_manager.loop)
+        if not worker.is_connected():
+            return
         print(f'🔄 [System] 向 Relay {worker.url} 发送标准订阅指令...')
         safe_now = int(time.time()) - 24 * 3600
         if self.last_sync_time > 0:
@@ -1096,4 +1277,3 @@ class PersistentChatUser:
             tags.append(['p', msg[1]])
         self._send_event(5, 'recall', tags)
         self.db.update_message_content(tid, tr('MSG_RECALLED'))
-

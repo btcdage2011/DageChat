@@ -17,6 +17,7 @@ Disclaimer / 免责声明:
    严禁将本软件用于任何违反当地法律法规的用途。
 -------------------------------------------------
 """
+
 import binascii
 CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
 

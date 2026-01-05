@@ -17,6 +17,7 @@ Disclaimer / 免责声明:
    严禁将本软件用于任何违反当地法律法规的用途。
 -------------------------------------------------
 """
+
 import os
 import json
 import time
@@ -346,3 +347,36 @@ class NostrCrypto:
         except Exception as e:
             print(f'❌ [Crypto] Mining Error: {e}')
             return None
+
+    @staticmethod
+    def derive_backup_key(priv_hex, salt):
+        try:
+            ikm = bytes.fromhex(priv_hex)
+            info = b'DageChat-Backup-Encryption-v1'
+            hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=info)
+            return hkdf.derive(ikm)
+        except Exception as e:
+            print(f'❌ [Crypto] Key Derivation Error: {e}')
+            return None
+
+    @staticmethod
+    def sign_backup_header(priv_hex, salt, nonce, pubkey_bytes):
+        try:
+            payload = salt + nonce + pubkey_bytes
+            msg_hash = hashlib.sha256(payload).digest()
+            msg_hex = msg_hash.hex()
+            return NostrCrypto.sign_event_id(priv_hex, msg_hex)
+        except Exception as e:
+            print(f'❌ [Crypto] Backup Sign Error: {e}')
+            return None
+
+    @staticmethod
+    def verify_backup_header(pub_hex, salt, nonce, sig_hex):
+        try:
+            pub_bytes = bytes.fromhex(pub_hex)
+            payload = salt + nonce + pub_bytes
+            msg_hash = hashlib.sha256(payload).digest()
+            msg_hex = msg_hash.hex()
+            return NostrCrypto.verify_signature(pub_hex, msg_hex, sig_hex)
+        except:
+            return False

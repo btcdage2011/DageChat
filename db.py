@@ -17,6 +17,7 @@ Disclaimer / 免责声明:
    严禁将本软件用于任何违反当地法律法规的用途。
 -------------------------------------------------
 """
+
 import sqlite3
 import json
 import threading
@@ -698,5 +699,121 @@ class DageDB:
             except Exception as e:
                 print(f'❌ [DB] Batch delete messages error: {e}')
                 return 0
+            finally:
+                cursor.close()
+
+    def get_backup_data(self, target_gid=None):
+        with self.lock:
+            cursor = self.conn.cursor()
+            data = {'contacts': [], 'groups': [], 'members': [], 'messages': []}
+            try:
+                print(f"📦 [Backup] Starting data extraction (Target: {(target_gid if target_gid else 'Global')})...")
+                relevant_pks = set()
+                sql_msg = 'SELECT * FROM messages'
+                params_msg = []
+                if target_gid:
+                    sql_msg += ' WHERE group_id = ?'
+                    params_msg.append(target_gid)
+                    relevant_pks.add(target_gid)
+                cursor.execute(sql_msg, tuple(params_msg))
+                msgs = []
+                for r in cursor.fetchall():
+                    msgs.append(r)
+                    relevant_pks.add(r[2])
+                    if r[1]:
+                        relevant_pks.add(r[1])
+                data['messages'] = msgs
+                sql_grp = 'SELECT * FROM groups'
+                params_grp = []
+                if target_gid:
+                    sql_grp += ' WHERE group_id = ?'
+                    params_grp.append(target_gid)
+                cursor.execute(sql_grp, tuple(params_grp))
+                grps = cursor.fetchall()
+                data['groups'] = grps
+                target_gids_for_members = [g[0] for g in grps]
+                if target_gids_for_members:
+                    placeholders = ','.join(('?' for _ in target_gids_for_members))
+                    sql_mem = f'SELECT * FROM group_members WHERE group_id IN ({placeholders})'
+                    cursor.execute(sql_mem, tuple(target_gids_for_members))
+                    mems = cursor.fetchall()
+                    data['members'] = mems
+                    for m in mems:
+                        relevant_pks.add(m[1])
+                if target_gid is None:
+                    cursor.execute('SELECT * FROM contacts')
+                    data['contacts'] = cursor.fetchall()
+                elif relevant_pks:
+                    placeholders = ','.join(('?' for _ in relevant_pks))
+                    cursor.execute(f'SELECT * FROM contacts WHERE pubkey IN ({placeholders})', tuple(relevant_pks))
+                    data['contacts'] = cursor.fetchall()
+                print('-' * 40)
+                print(f'✅ [Backup Summary]')
+                print(f"   - Messages : {len(data['messages'])}")
+                print(f"   - Groups   : {len(data['groups'])}")
+                print(f"   - Members  : {len(data.get('members', []))}")
+                print(f"   - Contacts : {len(data['contacts'])}")
+                print('-' * 40)
+            finally:
+                cursor.close()
+            return data
+
+    def restore_data_incremental(self, data, progress_callback=None, cancel_event=None):
+        total_steps = len(data.get('contacts', [])) + len(data.get('groups', [])) + len(data.get('members', [])) + len(data.get('messages', []))
+        current_step = 0
+        BATCH_SIZE = 500
+        stats = {'Groups': {'total': 0, 'inserted': 0}, 'Contacts': {'total': 0, 'inserted': 0}, 'Members': {'total': 0, 'inserted': 0}, 'Messages': {'total': 0, 'inserted': 0}}
+
+        def _batch_insert(cursor, sql_template, rows, desc):
+            nonlocal current_step
+            count = 0
+            inserted_count = 0
+            stats[desc]['total'] = len(rows)
+            for row in rows:
+                if cancel_event and cancel_event.is_set():
+                    self.conn.commit()
+                    raise InterruptedError('User Cancelled')
+                try:
+                    cursor.execute(sql_template, row)
+                    if cursor.rowcount > 0:
+                        inserted_count += 1
+                except:
+                    pass
+                count += 1
+                current_step += 1
+                if count % BATCH_SIZE == 0:
+                    self.conn.commit()
+                    if progress_callback:
+                        progress_callback(current_step, total_steps, f'Restoring {desc}...')
+            stats[desc]['inserted'] = inserted_count
+            self.conn.commit()
+        print(f'📥 [Restore] Starting incremental restore...')
+        with self.lock:
+            cursor = self.conn.cursor()
+            try:
+                if 'groups' in data:
+                    grp_sql = 'INSERT OR IGNORE INTO groups VALUES (?,?,?,?,?,?,?,?,?,?)'
+                    _batch_insert(cursor, grp_sql, data['groups'], 'Groups')
+                if 'contacts' in data:
+                    ct_sql = 'INSERT OR IGNORE INTO contacts VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                    _batch_insert(cursor, ct_sql, data['contacts'], 'Contacts')
+                if 'members' in data:
+                    mem_sql = 'INSERT OR IGNORE INTO group_members VALUES (?,?,?,?)'
+                    _batch_insert(cursor, mem_sql, data['members'], 'Members')
+                if 'messages' in data:
+                    msg_sql = 'INSERT OR IGNORE INTO messages VALUES (?,?,?,?,?,?,?)'
+                    _batch_insert(cursor, msg_sql, data['messages'], 'Messages')
+                print('-' * 40)
+                print(f'✅ [Restore Summary] (Incremental)')
+                for k, v in stats.items():
+                    print(f"   - {k:<10}: {v['inserted']} new / {v['total']} total")
+                print('-' * 40)
+                return (True, stats)
+            except InterruptedError:
+                print('⚠️ [Restore] Cancelled by user.')
+                return (False, 'Restore Cancelled (Saved partial progress)')
+            except Exception as e:
+                print(f'❌ [Restore] Error: {e}')
+                return (False, f'Error: {e}')
             finally:
                 cursor.close()

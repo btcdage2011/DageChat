@@ -607,28 +607,38 @@ class RelayConfigWindow(SafeToplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.title('Relay 连接管理')
-        self.center_window(700, 500)
+        self.title(tr('RELAY_WIN_TITLE'))
+        self.center_window(700, 600)
         self.attributes('-topmost', True)
         self.relay_rows = {}
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        self.config_path = os.path.join(base_path, 'relays.json')
+        proxy_frame = ctk.CTkFrame(self, fg_color='transparent')
+        proxy_frame.pack(fill='x', padx=10, pady=10)
+        ctk.CTkLabel(proxy_frame, text=tr('LBL_PROXY'), font=('Microsoft YaHei UI', 12)).pack(side='left', padx=5)
+        self.proxy_entry = ctk.CTkEntry(proxy_frame, placeholder_text='e.g. http://127.0.0.1:7890', width=300)
+        self.proxy_entry.pack(side='left', padx=5)
+        current_proxy = ''
+        if self.parent.client:
+            try:
+                current_proxy = self.parent.client.network_config.get('proxy_url', '')
+            except:
+                pass
+        self.proxy_entry.insert(0, current_proxy)
+        ctk.CTkButton(proxy_frame, text=tr('BTN_SAVE_PROXY'), width=80, command=self.save_proxy).pack(side='left', padx=5)
+        ctk.CTkLabel(proxy_frame, text=tr('LBL_PROXY_TIP'), text_color='gray', font=('Microsoft YaHei UI', 10)).pack(side='left', padx=5)
+        ctk.CTkFrame(self, height=2, fg_color='#444').pack(fill='x', padx=10, pady=5)
         top_frame = ctk.CTkFrame(self, fg_color='transparent')
         top_frame.pack(fill='x', padx=10, pady=10)
-        self.url_entry = ctk.CTkEntry(top_frame, placeholder_text='输入 Relay 地址 (ws://...)', width=350)
+        self.url_entry = ctk.CTkEntry(top_frame, placeholder_text=tr('PH_RELAY_URL'), width=350)
         self.url_entry.pack(side='left', padx=5)
-        ctk.CTkButton(top_frame, text='+ 添加并连接', width=100, command=self.add_relay).pack(side='left', padx=5)
+        ctk.CTkButton(top_frame, text=tr('BTN_ADD_CONNECT'), width=100, command=self.add_relay).pack(side='left', padx=5)
         header_frame = ctk.CTkFrame(self, height=30, fg_color='#333')
         header_frame.pack(fill='x', padx=10, pady=(10, 0))
-        ctk.CTkLabel(header_frame, text='地址', width=280, anchor='w').pack(side='left', padx=10)
-        ctk.CTkLabel(header_frame, text='状态', width=80, anchor='center').pack(side='left', padx=5)
-        ctk.CTkLabel(header_frame, text='操作', width=80, anchor='center').pack(side='right', padx=10)
+        ctk.CTkLabel(header_frame, text=tr('HEADER_ADDR'), width=280, anchor='w').pack(side='left', padx=10)
+        ctk.CTkLabel(header_frame, text=tr('HEADER_STATUS'), width=80, anchor='center').pack(side='left', padx=5)
+        ctk.CTkLabel(header_frame, text=tr('HEADER_ACTION'), width=80, anchor='center').pack(side='right', padx=10)
         self.scroll = ctk.CTkScrollableFrame(self)
         self.scroll.pack(fill='both', expand=True, padx=10, pady=5)
-        ctk.CTkLabel(self, text='提示: 修改后配置会自动保存。', text_color='gray', font=('Microsoft YaHei UI', 11)).pack(pady=5)
+        ctk.CTkLabel(self, text=tr('LBL_RELAY_DB_TIP'), text_color='gray', font=('Microsoft YaHei UI', 11)).pack(pady=5)
         self.refresh_list()
         self.start_auto_refresh()
 
@@ -648,27 +658,24 @@ class RelayConfigWindow(SafeToplevel):
                 if url in self.parent.client.relays:
                     latency = self.parent.client.relays[url].latency
             status_code = item['status']
-            status_color = 'gray'
-            status_text = '未知'
+            s_text = tr('STATUS_UNKNOWN')
+            s_col = 'gray'
             if status_code == 0:
-                status_color = '#D32F2F'
-                status_text = '断开'
+                s_text, s_col = (tr('RELAY_STATUS_DISCONNECT'), '#D32F2F')
             elif status_code == 1:
-                status_color = '#FFA000'
-                status_text = '连接中'
+                s_text, s_col = (tr('RELAY_STATUS_CONNECTING'), '#FFA000')
             elif status_code == 2:
-                status_color = '#388E3C'
-                status_text = '在线'
-            lat_text = f'{latency}ms' if latency >= 0 else '--'
-            lat_color = 'gray'
+                s_text, s_col = (tr('RELAY_STATUS_ONLINE'), '#388E3C')
+            l_text = f'{latency}ms' if latency >= 0 else '--'
+            l_col = 'gray'
             if latency > 0:
                 if latency < 100:
-                    lat_color = 'green'
+                    l_col = 'green'
                 elif latency < 300:
-                    lat_color = 'orange'
+                    l_col = 'orange'
                 else:
-                    lat_color = 'red'
-            new_data_map[url] = {'s_text': status_text, 's_col': status_color, 'l_text': lat_text, 'l_col': lat_color}
+                    l_col = '#D32F2F'
+            new_data_map[url] = {'s_text': s_text, 's_col': s_col, 'l_text': l_text, 'l_col': l_col}
         to_delete = []
         for url in self.relay_rows:
             if url not in new_data_map:
@@ -681,10 +688,8 @@ class RelayConfigWindow(SafeToplevel):
                 widgets = self.relay_rows[url]
                 if widgets['status_lbl'].cget('text') != props['s_text']:
                     widgets['status_lbl'].configure(text=props['s_text'], text_color=props['s_col'])
-                    widgets['status_lbl'].configure(text_color=props['s_col'])
                 if widgets['lat_lbl'].cget('text') != props['l_text']:
                     widgets['lat_lbl'].configure(text=props['l_text'], text_color=props['l_col'])
-                    widgets['lat_lbl'].configure(text_color=props['l_col'])
             else:
                 row = ctk.CTkFrame(self.scroll, fg_color='transparent', height=40)
                 row.pack(fill='x', pady=2)
@@ -693,82 +698,50 @@ class RelayConfigWindow(SafeToplevel):
                 s_lbl.pack(side='left', padx=5)
                 l_lbl = ctk.CTkLabel(row, text=props['l_text'], text_color=props['l_col'], width=60, anchor='e')
                 l_lbl.pack(side='left', padx=5)
-                ctk.CTkButton(row, text='删除', width=50, fg_color='#444', hover_color='#D32F2F', height=24, command=lambda u=url: self.delete_relay(u)).pack(side='right', padx=5)
-                ctk.CTkButton(row, text='复制', width=50, fg_color='#444', height=24, command=lambda u=url: self.copy_url(u)).pack(side='right', padx=5)
+                ctk.CTkButton(row, text=tr('BTN_DELETE'), width=50, fg_color='#444', hover_color='#D32F2F', height=24, command=lambda u=url: self.delete_relay(u)).pack(side='right', padx=5)
+                ctk.CTkButton(row, text=tr('BTN_COPY'), width=50, fg_color='#444', height=24, command=lambda u=url: self.copy_url(u)).pack(side='right', padx=5)
                 self.relay_rows[url] = {'frame': row, 'status_lbl': s_lbl, 'lat_lbl': l_lbl}
 
     def copy_url(self, url):
         self.clipboard_clear()
         self.clipboard_append(url)
         self.update()
-        app = getattr(self, 'parent', None) or getattr(self, 'parent_app', None)
-        self.show_toast('📋 地址已复制')
+        self.parent.show_toast(tr('TOAST_ADDR_COPIED'))
+
+    def save_proxy(self):
+        val = self.proxy_entry.get().strip()
+        try:
+            current_disabled = self.parent.client.network_config.get('proxy_disabled', False)
+            if self.parent.client.save_proxy_settings(val, current_disabled):
+                self.parent.show_toast(tr('TOAST_PROXY_SAVED'))
+            else:
+                self.parent.show_toast('保存失败 (文件错误)')
+        except Exception as e:
+            messagebox.showerror('Error', str(e), parent=self)
 
     def add_relay(self):
         url = self.url_entry.get().strip()
         if not url:
             return
         if not (url.startswith('ws://') or url.startswith('wss://')):
-            messagebox.showerror('格式错误', '地址必须以 ws:// 或 wss:// 开头', parent=self)
+            messagebox.showerror(tr('ERR_RELAY_FMT_TITLE'), tr('ERR_RELAY_FMT_MSG'), parent=self)
             return
-        try:
-            data = {}
-            if os.path.exists(self.config_path):
-                try:
-                    with open(self.config_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                except:
-                    data = {'client': {'relay_url': []}}
-            if 'client' not in data:
-                data['client'] = {}
-            if 'relay_url' not in data['client']:
-                data['client']['relay_url'] = []
-            urls = data['client']['relay_url']
-            if isinstance(urls, str):
-                urls = [urls]
-            if url not in urls:
-                urls.append(url)
-                data['client']['relay_url'] = urls
-                with open(self.config_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-                self.parent.client.add_relay_dynamic(url)
-                self.url_entry.delete(0, 'end')
-                self.refresh_list()
-                if hasattr(self.parent, 'show_toast'):
-                    self.parent.show_toast(f'✅ 已添加: {url}')
-            elif hasattr(self.parent, 'show_toast'):
-                self.parent.show_toast('⚠️ 该 Relay 已存在')
-        except Exception as e:
-            messagebox.showerror('错误', f'保存配置失败: {e}', parent=self)
+        if self.parent.client.add_relay_persistent(url):
+            self.url_entry.delete(0, 'end')
+            self.refresh_list()
+            self.parent.show_toast(tr('TOAST_RELAY_ADDED').format(url=url))
+        else:
+            self.parent.show_toast(tr('TOAST_RELAY_ADD_FAIL'))
 
     def delete_relay(self, target_url):
-        if not messagebox.askyesno('删除确认', f'确定删除节点？\n{target_url}', parent=self):
+        if not messagebox.askyesno(tr('DIALOG_DEL_RELAY_TITLE'), tr('DIALOG_DEL_RELAY_MSG').format(url=target_url), parent=self):
             return
-        try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                urls = data.get('client', {}).get('relay_url', [])
-                if isinstance(urls, str):
-                    urls = [urls]
-                if target_url in urls:
-                    urls.remove(target_url)
-                    data['client']['relay_url'] = urls
-                    with open(self.config_path, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=4, ensure_ascii=False)
-            with self.parent.client.lock:
-                if target_url in self.parent.client.relays:
-                    self.parent.client.relays[target_url].stop()
-                    del self.parent.client.relays[target_url]
+        if self.parent.client.remove_relay_persistent(target_url):
             self.parent.client.relay_manager._notify_status_change()
-            if target_url in self.relay_rows:
-                self.relay_rows[target_url]['frame'].destroy()
-                del self.relay_rows[target_url]
             self.refresh_list()
-            if hasattr(self.parent, 'show_toast'):
-                self.parent.show_toast('🗑️ 已删除 Relay')
-        except Exception as e:
-            messagebox.showerror('错误', f'删除失败: {e}', parent=self)
+            self.parent.show_toast(tr('TOAST_RELAY_DELETED'))
+        else:
+            self.parent.show_toast(tr('TOAST_RELAY_DEL_FAIL'))
 
 class LoginWindow(SafeToplevel):
 
@@ -830,7 +803,7 @@ class LoginWindow(SafeToplevel):
         if nick == '(暂无账号)' or nick == tr('LOGIN_NO_ACCOUNT') or (not nick):
             return
         if not pwd:
-            messagebox.showwarning(tr('DIALOG_INFO_TITLE'), tr('LOGIN_MSG_ENTER_PWD'), parent=self)
+            self.show_toast(tr('LOGIN_MSG_ENTER_PWD'))
             return
         db_path = os.path.join(self.data_root, f'user_{nick}', 'user.db')
         self.parent.start_backend_secure(db_path, mode='LOGIN', password=pwd, nickname=nick)
@@ -840,22 +813,22 @@ class LoginWindow(SafeToplevel):
         p1 = self.new_pwd.get()
         p2 = self.new_pwd_2.get()
         if not nick:
-            return messagebox.showwarning(tr('DIALOG_INFO_TITLE'), tr('LOGIN_MSG_ENTER_NICK'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_ENTER_NICK'))
         if not p1:
-            return messagebox.showwarning(tr('DIALOG_INFO_TITLE'), tr('LOGIN_MSG_ENTER_PWD'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_ENTER_PWD'))
         if len(p1) < 8:
-            return messagebox.showwarning(tr('DIALOG_WARN_TITLE'), tr('LOGIN_MSG_PWD_LEN'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_PWD_LEN'))
         if p1 != p2:
-            return messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_PWD_MISMATCH'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_PWD_MISMATCH'))
         folder_path = os.path.join(self.data_root, f'user_{nick}')
         if os.path.exists(folder_path):
-            return messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_USER_EXISTS'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_USER_EXISTS'))
         try:
             os.makedirs(folder_path)
             db_path = os.path.join(folder_path, 'user.db')
             self.parent.start_backend_secure(db_path, mode='CREATE', password=p1, nickname=nick)
         except Exception as e:
-            messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_DIR_ERR').format(e=e), parent=self)
+            self.show_toast(tr('LOGIN_MSG_DIR_ERR').format(e=e))
 
     def import_login(self):
         folder_name = self.imp_folder.get().strip()
@@ -865,11 +838,11 @@ class LoginWindow(SafeToplevel):
         pwd2 = self.imp_pwd_2.get()
         hex_key = to_hex_privkey(raw_key)
         if not folder_name or not hex_key or (not pwd):
-            return messagebox.showwarning(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_INFO_INCOMPLETE'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_INFO_INCOMPLETE'))
         if len(pwd) < 8:
-            return messagebox.showwarning(tr('DIALOG_WARN_TITLE'), tr('LOGIN_MSG_PWD_LEN'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_PWD_LEN'))
         if pwd != pwd2:
-            return messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_PWD_MISMATCH'), parent=self)
+            return self.show_toast(tr('LOGIN_MSG_PWD_MISMATCH'))
         folder_path = os.path.join(self.data_root, f'user_{folder_name}')
         try:
             if not os.path.exists(folder_path):
@@ -877,7 +850,7 @@ class LoginWindow(SafeToplevel):
             db_path = os.path.join(folder_path, 'user.db')
             self.parent.start_backend_secure(db_path, mode='IMPORT', password=pwd, nickname=nick, priv_key=hex_key)
         except Exception as e:
-            messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('LOGIN_MSG_IMPORT_ERR').format(e=e), parent=self)
+            self.show_toast(tr('LOGIN_MSG_IMPORT_ERR').format(e=e))
 
     def on_close(self):
         self.parent.destroy()
@@ -1312,7 +1285,7 @@ class SettingsWindow(SafeToplevel):
         super().__init__(parent_app)
         self.parent_app = parent_app
         self.title(tr('SETTING_WIN_TITLE'))
-        self.center_window(700, 550)
+        self.center_window(700, 600)
         self.attributes('-topmost', True)
         self.tab_view = ctk.CTkTabview(self)
         self.tab_view.pack(fill='both', expand=True, padx=10, pady=10)
@@ -1326,6 +1299,84 @@ class SettingsWindow(SafeToplevel):
         self._init_data_tab()
         self._init_about_tab()
         self._init_lang_tab()
+
+    def _init_network_tab(self):
+        self.main_scroll_frame = ctk.CTkScrollableFrame(self.tab_net)
+        self.main_scroll_frame.pack(fill='both', expand=True, padx=0, pady=0)
+        self.main_scroll_frame.grid_columnconfigure(0, weight=1)
+        relay_container = ctk.CTkFrame(self.main_scroll_frame, fg_color='transparent')
+        relay_container.grid(row=0, column=0, sticky='ew', padx=10, pady=(10, 5))
+        ctk.CTkLabel(relay_container, text='Relay Servers', font=('Microsoft YaHei UI', 12, 'bold')).pack(side='top', anchor='w', pady=5)
+        top_bar = ctk.CTkFrame(relay_container, fg_color='transparent')
+        top_bar.pack(side='top', fill='x', pady=5)
+        self.url_entry = ctk.CTkEntry(top_bar, placeholder_text=tr('PH_RELAY_URL'), width=300)
+        self.url_entry.pack(side='left', padx=5)
+        ctk.CTkButton(top_bar, text=tr('BTN_ADD_CONNECT'), width=120, command=self.add_relay).pack(side='left', padx=5)
+        header = ctk.CTkFrame(relay_container, height=25, fg_color='#333')
+        header.pack(side='top', fill='x', pady=(10, 0))
+        ctk.CTkLabel(header, text=tr('HEADER_ADDR'), width=250, anchor='w').pack(side='left', padx=10)
+        ctk.CTkLabel(header, text=tr('HEADER_STATUS'), width=80).pack(side='left', padx=5)
+        ctk.CTkLabel(header, text=tr('HEADER_ACTION'), width=80).pack(side='right', padx=20)
+        self.relay_scroll = ctk.CTkFrame(relay_container)
+        self.relay_scroll.pack(side='top', fill='x', expand=True)
+        self.relay_rows = {}
+        ctk.CTkFrame(self.main_scroll_frame, height=2, fg_color='#444').grid(row=1, column=0, sticky='ew', padx=10, pady=10)
+        proxy_container = ctk.CTkFrame(self.main_scroll_frame, fg_color='transparent')
+        proxy_container.grid(row=2, column=0, sticky='ew', padx=10, pady=5)
+        ctk.CTkLabel(proxy_container, text=tr('LBL_PROXY'), font=('Microsoft YaHei UI', 12, 'bold')).pack(side='top', anchor='w', pady=5)
+        p_row = ctk.CTkFrame(proxy_container, fg_color='transparent')
+        p_row.pack(side='top', fill='x', pady=2)
+        self.proxy_entry = ctk.CTkEntry(p_row, placeholder_text='http://127.0.0.1:7890', width=250)
+        self.proxy_entry.pack(side='left', padx=(0, 10))
+        current_proxy = ''
+        if self.parent_app.client:
+            try:
+                current_proxy = self.parent_app.client.network_config.get('proxy_url', '')
+            except:
+                pass
+        self.proxy_entry.insert(0, current_proxy)
+        ctk.CTkButton(p_row, text=tr('BTN_SAVE_PROXY'), width=80, fg_color='#1F6AA5', command=self.save_proxy).pack(side='left')
+        ctk.CTkLabel(proxy_container, text=tr('LBL_PROXY_TIP'), text_color='gray', font=('Microsoft YaHei UI', 10)).pack(side='top', anchor='w', pady=(5, 0))
+        self.disable_proxy_var = ctk.StringVar(master=self, value='0')
+        try:
+            if self.parent_app.client:
+                val = self.parent_app.client.network_config.get('proxy_disabled', False)
+                self.disable_proxy_var.set('1' if val else '0')
+        except:
+            pass
+        cb_disable = ctk.CTkCheckBox(proxy_container, text=tr('CB_DISABLE_PROXY'), variable=self.disable_proxy_var, onvalue='1', offvalue='0', command=self.toggle_proxy_disable)
+        cb_disable.pack(side='top', anchor='w', pady=5)
+        ctk.CTkFrame(self.main_scroll_frame, height=2, fg_color='#444').grid(row=3, column=0, sticky='ew', padx=10, pady=10)
+        bypass_container = ctk.CTkFrame(self.main_scroll_frame, fg_color='transparent')
+        bypass_container.grid(row=4, column=0, sticky='ew', padx=10, pady=5)
+        ctk.CTkLabel(bypass_container, text=tr('LBL_BYPASS_LIST'), font=('Microsoft YaHei UI', 12, 'bold')).pack(side='top', anchor='w')
+        bypass_input_row = ctk.CTkFrame(bypass_container, fg_color='transparent')
+        bypass_input_row.pack(side='top', fill='x', pady=2)
+        self.bypass_input = ctk.CTkEntry(bypass_input_row, placeholder_text=tr('PH_BYPASS_INPUT'), width=220)
+        self.bypass_input.pack(side='left', fill='x', expand=True, padx=(0, 5))
+        ctk.CTkButton(bypass_input_row, text=tr('BTN_ADD_CONNECT').replace('+ ', ''), width=80, command=self.add_bypass).pack(side='left')
+        self.bypass_scroll = ctk.CTkFrame(bypass_container)
+        self.bypass_scroll.pack(side='top', fill='x', pady=5)
+        self.bypass_rows = {}
+        ctk.CTkFrame(self.main_scroll_frame, height=2, fg_color='#444').grid(row=5, column=0, sticky='ew', padx=10, pady=10)
+        reset_container = ctk.CTkFrame(self.main_scroll_frame, fg_color='transparent')
+        reset_container.grid(row=6, column=0, sticky='ew', pady=10)
+        ctk.CTkButton(reset_container, text=tr('BTN_RESET_NET'), fg_color='#D32F2F', width=200, command=self.perform_reset).pack(side='top')
+        self.refresh_relay_list()
+        self.refresh_bypass_list()
+        self.start_relay_refresh_loop()
+
+    def refresh_bypass_list(self):
+        for w in self.bypass_scroll.winfo_children():
+            w.destroy()
+        bypass_list = []
+        if self.parent_app.client:
+            bypass_list = self.parent_app.client.network_config.get('proxy_bypass', [])
+        for rule in bypass_list:
+            row = ctk.CTkFrame(self.bypass_scroll, fg_color='transparent', height=30)
+            row.pack(fill='x', pady=2)
+            ctk.CTkLabel(row, text=rule, anchor='w', font=('Consolas', 12)).pack(side='left', padx=10)
+            ctk.CTkButton(row, text='×', width=30, height=24, fg_color='#444', hover_color='#D32F2F', command=lambda r=rule: self.delete_bypass(r)).pack(side='right', padx=10)
 
     def _init_lang_tab(self):
         frame = self.tab_lang
@@ -1347,28 +1398,60 @@ class SettingsWindow(SafeToplevel):
             else:
                 messagebox.showerror('Error', 'Failed to save config.', parent=self)
 
-    def _init_network_tab(self):
-        frame = self.tab_net
-        top_bar = ctk.CTkFrame(frame, fg_color='transparent')
-        top_bar.pack(fill='x', pady=5)
-        self.url_entry = ctk.CTkEntry(top_bar, placeholder_text='输入 Relay 地址 (ws://...)', width=350)
-        self.url_entry.pack(side='left', padx=5)
-        ctk.CTkButton(top_bar, text='+ 添加并连接', width=100, command=self.add_relay).pack(side='left', padx=5)
-        header = ctk.CTkFrame(frame, height=30, fg_color='#333')
-        header.pack(fill='x', pady=(10, 0))
-        ctk.CTkLabel(header, text='地址', width=250, anchor='w').pack(side='left', padx=10)
-        ctk.CTkLabel(header, text='状态', width=80).pack(side='left', padx=5)
-        ctk.CTkLabel(header, text='延迟', width=80).pack(side='left', padx=5)
-        self.relay_scroll = ctk.CTkScrollableFrame(frame)
-        self.relay_scroll.pack(fill='both', expand=True, pady=5)
-        self.relay_rows = {}
-        self.refresh_relay_list()
-        self.start_relay_refresh_loop()
+    def add_bypass(self):
+        val = self.bypass_input.get().strip()
+        if not val:
+            return
+        if self.parent_app.client.add_bypass_rule(val):
+            self.bypass_input.delete(0, 'end')
+            self.refresh_bypass_list()
+            threading.Thread(target=self.parent_app.client.reconnect_all_relays, daemon=True).start()
+            self.parent_app.show_toast(tr('TOAST_BYPASS_ADDED').format(val=val))
+
+    def delete_bypass(self, rule):
+        if self.parent_app.client.remove_bypass_rule(rule):
+            self.refresh_bypass_list()
+            threading.Thread(target=self.parent_app.client.reconnect_all_relays, daemon=True).start()
+            self.parent_app.show_toast(tr('TOAST_BYPASS_DEL'))
+
+    def perform_reset(self):
+        if messagebox.askyesno(tr('DIALOG_RESET_NET_TITLE'), tr('DIALOG_RESET_NET_MSG'), parent=self):
+            if self.parent_app.client.reset_network_settings():
+                self.proxy_entry.delete(0, 'end')
+                self.disable_proxy_var.set('0')
+                self.bypass_input.delete(0, 'end')
+                self.refresh_bypass_list()
+                self.refresh_relay_list()
+                self.parent_app.show_toast(tr('TOAST_RESET_OK'))
+                threading.Thread(target=self.parent_app.client.reconnect_all_relays, daemon=True).start()
+            else:
+                self.parent_app.show_toast('Reset Failed')
+
+    def toggle_proxy_disable(self):
+        self.save_proxy()
+        val = self.disable_proxy_var.get()
+        msg = tr('TOAST_PROXY_ALL_DISABLED') if val == '1' else tr('TOAST_PROXY_ALL_ENABLED')
+        self.parent_app.show_toast(msg)
+        threading.Thread(target=self.parent_app.client.reconnect_all_relays, daemon=True).start()
 
     def start_relay_refresh_loop(self):
         if self.winfo_exists():
             self.refresh_relay_list()
             self.after(1000, self.start_relay_refresh_loop)
+
+    def save_proxy(self):
+        try:
+            val = self.proxy_entry.get().strip()
+            is_disabled = self.disable_proxy_var.get() == '1'
+            bypass_str = self.bypass_entry.get().strip()
+            if self.parent_app.client.save_proxy_settings(val, is_disabled, bypass_str):
+                self.parent_app.show_toast(tr('TOAST_PROXY_SAVED'))
+                self.parent_app.show_toast(tr('TOAST_NET_RECONNECTING'))
+                threading.Thread(target=self.parent_app.client.reconnect_all_relays, daemon=True).start()
+            else:
+                self.parent_app.show_toast('保存失败 (文件错误)')
+        except Exception as e:
+            messagebox.showerror('Error', str(e), parent=self)
 
     def refresh_relay_list(self):
         status_data = self.parent_app.client.get_connection_status()
@@ -1376,17 +1459,19 @@ class SettingsWindow(SafeToplevel):
         new_data_map = {}
         for item in details:
             url = item['url']
-            status_code = item['status']
             latency = -1
             with self.parent_app.client.lock:
                 if url in self.parent_app.client.relays:
                     latency = self.parent_app.client.relays[url].latency
+            status_code = item['status']
+            s_text = tr('STATUS_UNKNOWN')
+            s_col = 'gray'
             if status_code == 0:
-                s_text, s_col = ('断开', '#D32F2F')
+                s_text, s_col = (tr('RELAY_STATUS_DISCONNECT'), '#D32F2F')
             elif status_code == 1:
-                s_text, s_col = ('连接中', '#FFA000')
-            else:
-                s_text, s_col = ('在线', '#388E3C')
+                s_text, s_col = (tr('RELAY_STATUS_CONNECTING'), '#FFA000')
+            elif status_code == 2:
+                s_text, s_col = (tr('RELAY_STATUS_ONLINE'), '#388E3C')
             l_text = f'{latency}ms' if latency >= 0 else '--'
             l_col = 'gray'
             if latency > 0:
@@ -1414,91 +1499,44 @@ class SettingsWindow(SafeToplevel):
             else:
                 row = ctk.CTkFrame(self.relay_scroll, fg_color='transparent', height=35)
                 row.pack(fill='x', pady=2)
-                ctk.CTkLabel(row, text=url, width=250, anchor='w', font=('Microsoft YaHei UI', 12)).pack(side='left', padx=10)
-                s_lbl = ctk.CTkLabel(row, text=props['s_text'], text_color=props['s_col'], width=80, font=('Microsoft YaHei UI', 12))
+                ctk.CTkLabel(row, text=url, width=220, anchor='w', font=('Microsoft YaHei UI', 12)).pack(side='left', padx=5)
+                s_lbl = ctk.CTkLabel(row, text=props['s_text'], text_color=props['s_col'], width=50)
                 s_lbl.pack(side='left', padx=5)
-                l_lbl = ctk.CTkLabel(row, text=props['l_text'], text_color=props['l_col'], width=80, font=('Microsoft YaHei UI', 12))
+                l_lbl = ctk.CTkLabel(row, text=props['l_text'], text_color=props['l_col'], width=60, anchor='e')
                 l_lbl.pack(side='left', padx=5)
-                ctk.CTkButton(row, text='删除', width=50, height=24, fg_color='#444', hover_color='#D32F2F', font=('Microsoft YaHei UI', 12), command=lambda u=url: self.delete_relay(u)).pack(side='right', padx=10)
-                ctk.CTkButton(row, text='复制', width=50, height=24, fg_color='#444', font=('Microsoft YaHei UI', 12), command=lambda u=url: self.copy_url(u)).pack(side='right', padx=5)
+                ctk.CTkButton(row, text=tr('BTN_DELETE'), width=50, height=24, fg_color='#444', hover_color='#D32F2F', font=('Microsoft YaHei UI', 12), command=lambda u=url: self.delete_relay(u)).pack(side='right', padx=10)
+                ctk.CTkButton(row, text=tr('BTN_COPY'), width=50, height=24, fg_color='#444', font=('Microsoft YaHei UI', 12), command=lambda u=url: self.copy_url(u)).pack(side='right', padx=5)
                 self.relay_rows[url] = {'frame': row, 'status_lbl': s_lbl, 'lat_lbl': l_lbl}
 
     def copy_url(self, url):
         self.clipboard_clear()
         self.clipboard_append(url)
         self.update()
-        self.show_toast('📋 地址已复制')
+        self.parent_app.show_toast(tr('TOAST_ADDR_COPIED'))
 
     def add_relay(self):
         url = self.url_entry.get().strip()
         if not url:
             return
         if not (url.startswith('ws://') or url.startswith('wss://')):
-            self.parent_app.show_toast('❌ 格式错误: 需以 ws:// 或 wss:// 开头')
+            messagebox.showerror(tr('ERR_RELAY_FMT_TITLE'), tr('ERR_RELAY_FMT_MSG'), parent=self)
             return
-        try:
-            if getattr(sys, 'frozen', False):
-                base_path = os.path.dirname(sys.executable)
-            else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(base_path, 'relays.json')
-            data = {}
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                except:
-                    data = {'client': {'relay_url': []}}
-            if 'client' not in data:
-                data['client'] = {}
-            if 'relay_url' not in data['client']:
-                data['client']['relay_url'] = []
-            urls = data['client']['relay_url']
-            if isinstance(urls, str):
-                urls = [urls]
-            if url not in urls:
-                urls.append(url)
-                data['client']['relay_url'] = urls
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-                self.parent_app.client.add_relay_dynamic(url)
-                self.url_entry.delete(0, 'end')
-                self.refresh_relay_list()
-                self.show_toast(f'✅ 已添加: {url}')
-            else:
-                self.show_toast('⚠️ 该 Relay 已存在')
-        except Exception as e:
-            self.parent_app.show_toast(f'❌ 保存失败: {e}')
+        if self.parent_app.client.add_relay_persistent(url):
+            self.url_entry.delete(0, 'end')
+            self.refresh_relay_list()
+            self.parent_app.show_toast(tr('TOAST_RELAY_ADDED').format(url=url))
+        else:
+            self.parent_app.show_toast(tr('TOAST_RELAY_ADD_FAIL'))
 
-    def delete_relay(self, url):
-        if not messagebox.askyesno('删除确认', f'确定删除节点？\n{url}', parent=self):
+    def delete_relay(self, target_url):
+        if not messagebox.askyesno(tr('DIALOG_DEL_RELAY_TITLE'), tr('DIALOG_DEL_RELAY_MSG').format(url=target_url), parent=self):
             return
-        try:
-            if getattr(sys, 'frozen', False):
-                base_path = os.path.dirname(sys.executable)
-            else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(base_path, 'relays.json')
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                urls = data.get('client', {}).get('relay_url', [])
-                if isinstance(urls, str):
-                    urls = [urls]
-                if url in urls:
-                    urls.remove(url)
-                    data['client']['relay_url'] = urls
-                    with open(config_path, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=4, ensure_ascii=False)
-            with self.parent_app.client.lock:
-                if url in self.parent_app.client.relays:
-                    self.parent_app.client.relays[url].stop()
-                    del self.parent_app.client.relays[url]
+        if self.parent_app.client.remove_relay_persistent(target_url):
             self.parent_app.client.relay_manager._notify_status_change()
             self.refresh_relay_list()
-            self.show_toast('🗑️ Relay 已删除')
-        except Exception as e:
-            self.show_toast(f'❌ 删除出错: {e}')
+            self.parent_app.show_toast(tr('TOAST_RELAY_DELETED'))
+        else:
+            self.parent_app.show_toast(tr('TOAST_RELAY_DEL_FAIL'))
 
     def _init_privacy_tab(self):
         frame = self.tab_priv
@@ -1520,11 +1558,16 @@ class SettingsWindow(SafeToplevel):
         self.timeout_entry.insert(0, str(current_min))
         ctk.CTkButton(input_row, text=tr('SETTING_BTN_SAVE_TIMEOUT'), width=120, fg_color='#1F6AA5', command=self.save_timeout).pack(side='left')
         ctk.CTkFrame(frame, height=2, fg_color='#444').pack(fill='x', padx=10, pady=10)
-        ctk.CTkLabel(frame, text='本地屏蔽名单 (仅自己不可见)', text_color='gray').pack(pady=5)
+        ctk.CTkButton(frame, text=tr('SETTING_BTN_CHANGE_PWD'), fg_color='#D32F2F', height=36, command=self.open_change_pwd).pack(fill='x', padx=20, pady=5)
+        ctk.CTkFrame(frame, height=2, fg_color='#444').pack(fill='x', padx=10, pady=10)
+        ctk.CTkLabel(frame, text=tr('SETTING_LBL_BLOCKLIST'), text_color='gray').pack(pady=5)
         self.block_scroll = ctk.CTkScrollableFrame(frame)
         self.block_scroll.pack(fill='both', expand=True, padx=5, pady=5)
-        ctk.CTkButton(frame, text='刷新列表', command=self.load_block_list).pack(pady=5)
+        ctk.CTkButton(frame, text=tr('BTN_REFRESH'), command=self.load_block_list).pack(pady=5)
         self.load_block_list()
+
+    def open_change_pwd(self):
+        ChangePasswordDialog(self.parent_app)
 
     def save_timeout(self):
         try:
@@ -1559,10 +1602,38 @@ class SettingsWindow(SafeToplevel):
 
     def _init_data_tab(self):
         frame = self.tab_data
-        ctk.CTkLabel(frame, text='数据检索与备份', font=('Microsoft YaHei UI', 14, 'bold')).pack(pady=20)
-        ctk.CTkButton(frame, text='🔍 全局消息搜索', height=40, width=200, command=lambda: SearchWindow(self.parent_app, target_id=None)).pack(pady=10)
-        ctk.CTkButton(frame, text='📤 导出所有聊天记录', height=40, width=200, fg_color='#1F6AA5', command=lambda: ExportSelectionDialog(self.parent_app, target_id=None, target_name='All_Backup')).pack(pady=10)
-        ctk.CTkLabel(frame, text='提示: 导出操作可能较慢，请耐心等待。', text_color='gray').pack(pady=10)
+        ctk.CTkLabel(frame, text=tr('LBL_DATA_MANAGE'), font=('Microsoft YaHei UI', 14, 'bold')).pack(pady=20)
+        ctk.CTkButton(frame, text=tr('MENU_SEARCH_CHAT'), height=40, width=220, command=lambda: SearchWindow(self.parent_app, target_id=None)).pack(pady=10)
+        ctk.CTkFrame(frame, height=2, fg_color='#444').pack(fill='x', padx=40, pady=10)
+        ctk.CTkLabel(frame, text=f'本地全量备份 (.dgbk)', font=('Microsoft YaHei UI', 12)).pack(pady=(10, 5))
+        btn_frame = ctk.CTkFrame(frame, fg_color='transparent')
+        btn_frame.pack(pady=5)
+        ctk.CTkButton(btn_frame, text=tr('BKP_BTN_START'), height=40, width=140, fg_color='#1F6AA5', command=self.do_backup_global).pack(side='left', padx=10)
+        ctk.CTkButton(btn_frame, text=tr('RST_BTN_START'), height=40, width=140, fg_color='green', command=self.do_restore_global).pack(side='left', padx=10)
+        ctk.CTkLabel(frame, text=tr('LBL_BACKUP_TIP'), text_color='gray', font=('Microsoft YaHei UI', 10)).pack(pady=10)
+        ctk.CTkButton(frame, text=tr('BTN_EXPORT_PLAIN'), height=30, width=200, fg_color='#555', command=lambda: ExportSelectionDialog(self.parent_app, target_id=None, target_name='All_Plain')).pack(pady=20)
+
+    def do_backup_global(self):
+        from datetime import datetime
+        default_name = f"DageChat_Backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.dgbk"
+        path = ctk.filedialog.asksaveasfilename(parent=self, defaultextension='.dgbk', initialfile=default_name, title=tr('TITLE_SAVE_BACKUP'), filetypes=[('DageChat Backup', '*.dgbk')])
+        if not path:
+            return
+        from backup_manager import BackupManager
+        manager = BackupManager(self.parent_app.client)
+        from gui_windows import TaskProgressWindow
+        TaskProgressWindow(self.parent_app, tr('BKP_TITLE'), BackupManager.run_backup, manager, path, None, toast_master=self)
+
+    def do_restore_global(self):
+        path = ctk.filedialog.askopenfilename(parent=self, title=tr('TITLE_SELECT_BACKUP'), filetypes=[('DageChat Backup', '*.dgbk')])
+        if not path:
+            return
+        if not messagebox.askyesno(tr('DIALOG_RST_CONFIRM'), tr('DIALOG_RST_MSG'), parent=self):
+            return
+        from backup_manager import BackupManager
+        manager = BackupManager(self.parent_app.client)
+        from gui_windows import TaskProgressWindow
+        TaskProgressWindow(self.parent_app, tr('RST_TITLE'), BackupManager.run_restore, manager, path, toast_master=self)
 
     def _init_about_tab(self):
         frame = self.tab_about
@@ -2004,3 +2075,116 @@ class ScreenshotOverlay(tk.Toplevel):
         else:
             self.destroy()
             self.on_capture(None)
+
+class ChangePasswordDialog(SafeToplevel):
+
+    def __init__(self, parent_app):
+        super().__init__(parent_app)
+        self.parent_app = parent_app
+        self.title(tr('DIALOG_CHANGE_PWD_TITLE'))
+        w, h = (400, 350)
+        self.center_window(w, h)
+        self.attributes('-topmost', True)
+        self.resizable(False, False)
+        padding_x = 30
+        ctk.CTkLabel(self, text=tr('LBL_OLD_PWD'), font=('Microsoft YaHei UI', 12)).pack(anchor='w', padx=padding_x, pady=(20, 5))
+        self.entry_old = ctk.CTkEntry(self, width=340, show='*')
+        self.entry_old.pack(padx=padding_x)
+        ctk.CTkLabel(self, text=tr('LBL_NEW_PWD'), font=('Microsoft YaHei UI', 12)).pack(anchor='w', padx=padding_x, pady=(15, 5))
+        self.entry_new = ctk.CTkEntry(self, width=340, show='*')
+        self.entry_new.pack(padx=padding_x)
+        ctk.CTkLabel(self, text=tr('LBL_CONFIRM_PWD'), font=('Microsoft YaHei UI', 12)).pack(anchor='w', padx=padding_x, pady=(15, 5))
+        self.entry_confirm = ctk.CTkEntry(self, width=340, show='*')
+        self.entry_confirm.pack(padx=padding_x)
+        btn_frame = ctk.CTkFrame(self, fg_color='transparent')
+        btn_frame.pack(pady=30)
+        ctk.CTkButton(btn_frame, text=tr('BTN_CONFIRM'), fg_color='green', width=120, command=self.do_change).pack(side='left', padx=10)
+        ctk.CTkButton(btn_frame, text=tr('BTN_CANCEL'), fg_color='gray', width=120, command=self.destroy).pack(side='left', padx=10)
+
+    def do_change(self):
+        old_pass = self.entry_old.get()
+        new_pass = self.entry_new.get()
+        confirm_pass = self.entry_confirm.get()
+        if not old_pass:
+            messagebox.showwarning(tr('DIALOG_WARN_TITLE'), tr('LOGIN_MSG_ENTER_PWD'), parent=self)
+            return
+        if len(new_pass) < 8:
+            messagebox.showwarning(tr('DIALOG_WARN_TITLE'), tr('ERR_PWD_SHORT'), parent=self)
+            return
+        if new_pass != confirm_pass:
+            messagebox.showerror(tr('DIALOG_ERROR_TITLE'), tr('ERR_PWD_MISMATCH'), parent=self)
+            return
+        if new_pass == old_pass:
+            messagebox.showinfo(tr('DIALOG_INFO_TITLE'), '新密码不能与旧密码相同', parent=self)
+            return
+        success, msg = self.parent_app.client.change_password(old_pass, new_pass)
+        if success:
+            messagebox.showinfo(tr('DIALOG_INFO_TITLE'), tr('TOAST_PWD_CHANGED'), parent=self)
+            self.destroy()
+        else:
+            messagebox.showerror(tr('DIALOG_ERROR_TITLE'), msg, parent=self)
+
+class TaskProgressWindow(SafeToplevel):
+
+    def __init__(self, parent_app, title, task_func, *args, toast_master=None):
+        super().__init__(parent_app)
+        self.title(title)
+        self.center_window(400, 180)
+        self.resizable(False, False)
+        self.attributes('-topmost', True)
+        self.grab_set()
+        self.task_func = task_func
+        self.task_args = args
+        self.toast_master = toast_master if toast_master else parent_app
+        self.is_running = True
+        self.lbl_status = ctk.CTkLabel(self, text='Starting...', font=('Microsoft YaHei UI', 12))
+        self.lbl_status.pack(pady=(20, 10))
+        self.progress_bar = ctk.CTkProgressBar(self, width=300)
+        self.progress_bar.pack(pady=10)
+        self.progress_bar.set(0)
+        self.btn_cancel = ctk.CTkButton(self, text=tr('BTN_CANCEL'), fg_color='#D32F2F', command=self.on_cancel)
+        self.btn_cancel.pack(pady=10)
+        self.protocol('WM_DELETE_WINDOW', self.on_cancel)
+        self.thread = threading.Thread(target=self._bg_run, daemon=True)
+        self.thread.start()
+
+    def update_progress(self, percent, text):
+        if not self.winfo_exists():
+            return
+        self.after(0, lambda: self._ui_update(percent, text))
+
+    def _ui_update(self, percent, text):
+        try:
+            self.progress_bar.set(percent / 100.0)
+            self.lbl_status.configure(text=text)
+        except:
+            pass
+
+    def on_cancel(self):
+        if not self.is_running:
+            self.destroy()
+            return
+        self.btn_cancel.configure(state='disabled', text=tr('BTN_STOPPING'))
+        self.lbl_status.configure(text=tr('STATUS_CANCELLING'))
+        if self.task_args and hasattr(self.task_args[0], 'cancel'):
+            self.task_args[0].cancel()
+
+    def _bg_run(self):
+
+        def _cb(p, t):
+            self.update_progress(p, t)
+        try:
+            success, msg = self.task_func(*self.task_args, _cb)
+        except Exception as e:
+            success, msg = (False, str(e))
+        self.is_running = False
+        self.after(0, lambda: self._finish(success, msg))
+
+    def _finish(self, success, msg):
+        self.destroy()
+        if success:
+            self.parent_app.show_toast(f'✅ {msg}', duration=3000, master=self.toast_master)
+        elif 'Cancel' in msg or '取消' in msg:
+            self.parent_app.show_toast(f'⚠️ {msg}', duration=3000, master=self.toast_master)
+        else:
+            messagebox.showerror(tr('DIALOG_ERROR_TITLE'), msg, parent=self.toast_master)
