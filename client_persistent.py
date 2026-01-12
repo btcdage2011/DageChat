@@ -756,35 +756,6 @@ class PersistentChatUser:
     def _handle_dm_legacy(self, event):
         pass
 
-    def _handle_invite_logic(self, payload):
-        try:
-            gid = payload.get('group_id')
-            name = payload.get('name', '未知群组')
-            key = payload.get('key')
-            owner = payload.get('owner')
-            gtype = payload.get('gtype', 0)
-            if not gid or not key:
-                return
-            if self.db.is_group_blocked(gid):
-                print(f'🛑 [System] 自动忽略已屏蔽群组邀请: {gid}')
-                return
-            if gid in self.groups:
-                if self.groups[gid]['key_hex'] == key:
-                    return
-                else:
-                    print(f'♻️ [System]群组 {name} 密钥更新')
-            print(f'📩 [System] 接受群组邀请: {name} ({gid[:8]}...)')
-            self.db.save_group(gid, name, key, owner_pubkey=owner, group_type=gtype)
-            self.groups[gid] = {'name': name, 'key_hex': key, 'type': gtype}
-            req_msg = json.dumps(['REQ', gid])
-            self.relay_manager.broadcast_send(req_msg)
-            self._print_to_ui('system', f'已通过邀请加入群聊: {name}')
-            self._print_to_ui('refresh', None)
-        except Exception as e:
-            print(f'❌ [System] 处理邀请失败: {e}')
-            import traceback
-            traceback.print_exc()
-
     def _process_ghost_payload(self, event, payload, sender_pk, origin_event_pubkey):
         try:
             group_id = event.get('_actual_gid', sender_pk)
@@ -1173,25 +1144,18 @@ class PersistentChatUser:
             gid = sha256(f'{name}{self.pk}'.encode()).hexdigest()[:16]
         self.db.save_group(gid, name, key_hex, owner_pubkey=self.pk, created_at=int(time.time()), group_type=g_type)
         self.groups[gid] = {'name': name, 'key_hex': key_hex, 'type': g_type}
-        self.relay_manager.broadcast_send(json.dumps(['REQ', gid]))
-        self.sync_backup_to_cloud()
+        sub_id = f'sub_create_{gid[:8]}'
+        filter_obj = {}
+        if is_ghost:
+            filter_obj = {'kinds': [1059], '#p': [gid], 'limit': 0}
+        else:
+            filter_obj = {'kinds': [42, 30078], '#g': [gid], 'limit': 0}
+        req_msg = json.dumps(['REQ', sub_id, filter_obj])
+        self.relay_manager.broadcast_send(req_msg)
+        threading.Thread(target=self.sync_backup_to_cloud, daemon=True).start()
         if not is_ghost:
             self._publish_group_beacon(gid)
         return gid
-
-    def invite_user(self, gid, friend_pk):
-        if gid not in self.groups:
-            return
-        grp = self.groups[gid]
-        self.db.add_group_member(gid, friend_pk)
-        payload = {'type': 'invite', 'group_id': gid, 'name': grp['name'], 'key': grp['key_hex'], 'owner': self.pk, 'gtype': grp.get('type', 0)}
-        payload_json = json.dumps(payload)
-        wrap_event = NostrCrypto.make_gift_wrap(self.priv_k, friend_pk, payload_json, kind=14)
-        if not wrap_event:
-            return
-        self.relay_manager.broadcast_send(json.dumps(['EVENT', wrap_event]))
-        self._publish_group_members(gid)
-        self._print_to_ui('system', f'已向用户 {friend_pk[:6]}... 发送邀请')
 
     def _publish_group_members(self, gid):
         owner = self.db.get_group_owner(gid)

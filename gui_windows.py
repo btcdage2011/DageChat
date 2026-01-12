@@ -77,23 +77,29 @@ class SafeToplevel(ctk.CTkToplevel):
     def __init__(self, *args, **kwargs):
         self._is_destroyed = False
         self._pending_tasks = []
-        if args and hasattr(args[0], 'show_toast'):
-            self.parent_app = args[0]
-        else:
-            self.parent_app = kwargs.get('parent_app', None)
+        self.centering_master = args[0] if args else None
+        self.parent_app = None
+        if self.centering_master:
+            if hasattr(self.centering_master, 'show_toast'):
+                self.parent_app = self.centering_master
+            elif hasattr(self.centering_master, 'parent_app'):
+                self.parent_app = self.centering_master.parent_app
+        if 'parent_app' in kwargs:
+            self.parent_app = kwargs['parent_app']
         super().__init__(*args, **kwargs)
         self.bind('<Destroy>', self._on_destroy_event)
         self._focus_task = self.after(200, self._safe_focus)
         self._pending_tasks.append(self._focus_task)
 
     def center_window(self, w, h):
-        if self.parent_app and hasattr(self.parent_app, 'winfo_x'):
+        target = self.centering_master if self.centering_master else self.parent_app
+        if target and hasattr(target, 'winfo_x'):
             try:
-                self.parent_app.update_idletasks()
-                p_x = self.parent_app.winfo_x()
-                p_y = self.parent_app.winfo_y()
-                p_w = self.parent_app.winfo_width()
-                p_h = self.parent_app.winfo_height()
+                target.update_idletasks()
+                p_x = target.winfo_x()
+                p_y = target.winfo_y()
+                p_w = target.winfo_width()
+                p_h = target.winfo_height()
                 x = p_x + (p_w - w) // 2
                 y = p_y + (p_h - h) // 2
                 x = max(0, x)

@@ -51,7 +51,7 @@ if False:
     import gui_viewer
     import nacl
     import coincurve
-APP_VERSION = 'v0.5.5'
+APP_VERSION = 'v0.5.6'
 APP_BUILD_NAME = f'DageChat Beta {APP_VERSION}'
 APP_AUMID = f'DageTech.DageChat.Client.{APP_VERSION}'
 
@@ -127,23 +127,30 @@ class ChatApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.app_version = APP_VERSION
-        try:
-            import ctypes
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_AUMID)
-        except Exception as e:
-            print(f'Set AUMID failed: {e}')
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_AUMID)
+            except Exception as e:
+                print(f'Set AUMID failed: {e}')
         self.is_window_focused = True
         self.bind('<FocusIn>', self._on_focus_in)
         self.bind('<FocusOut>', self._on_focus_out)
         self.bind('<Alt-a>', self.start_screenshot)
         self.bind('<Alt-A>', self.start_screenshot)
         self.protocol('WM_DELETE_WINDOW', self.on_x_click)
-        icon_path = _get_resource_path(os.path.join('img', 'dagechat.ico'))
-        if os.path.exists(icon_path):
-            try:
-                self.iconbitmap(icon_path)
-            except Exception as e:
-                print(f'Set icon error: {e}')
+        try:
+            if sys.platform == 'win32':
+                icon_path = _get_resource_path(os.path.join('img', 'dagechat.ico'))
+                if os.path.exists(icon_path):
+                    self.iconbitmap(icon_path)
+            else:
+                png_path = _get_resource_path(os.path.join('img', 'dagechat.png'))
+                if os.path.exists(png_path):
+                    icon_img = tk.PhotoImage(file=png_path)
+                    self.iconphoto(True, icon_img)
+        except Exception as e:
+            print(f'Set icon error: {e}')
         self.pending_mentions = {}
         self.pending_image_bytes = None
         self.is_multi_select_mode = False
@@ -504,7 +511,7 @@ class ChatApp(ctk.CTk):
                     parsed_data = temp_data
                 elif 'text' in temp_data:
                     inner_text = temp_data['text']
-                    if inner_text and inner_text.strip().startswith('{'):
+                    if inner_text and isinstance(inner_text, str) and inner_text.strip().startswith('{'):
                         try:
                             inner_json = json.loads(inner_text)
                             if inner_json.get('type') == 'history':
@@ -579,13 +586,22 @@ class ChatApp(ctk.CTk):
             msg_box.pack(padx=10, pady=5)
             msg_box.insert('0.0', text_display)
             msg_box.configure(state='disabled')
+            msg_box.bind('<Button-3>', lambda e=None: self.show_context_menu(e, msg_id, content, is_me, sender_pk))
             urls = re.findall('(https?://\\S+)', text_display)
             if urls:
                 self._process_media_urls(container, urls)
                 for url in urls:
                     btn = ctk.CTkButton(container, text=f'🔗 Open: {url[:20]}...', height=24, fg_color='#444', font=('Microsoft YaHei UI', 11), command=lambda u=url: webbrowser.open(u))
                     btn.pack(pady=2, padx=5, fill='x')
-            msg_box.bind('<Button-3>', lambda e=None: self.show_context_menu(e, msg_id, content, is_me, sender_pk))
+            dage_links = re.findall('(dage://invite/\\S+)', text_display)
+            for d_link in dage_links:
+                btn_text = '🚀 加入群聊'
+                btn_col = '#1F6AA5'
+                if '/ghost/' in d_link:
+                    btn_text = '⚡ 加入共享群'
+                    btn_col = '#7B1FA2'
+                btn = ctk.CTkButton(container, text=btn_text, height=28, fg_color=btn_col, font=('Microsoft YaHei UI', 12, 'bold'), command=lambda l=d_link: self.handle_dage_link(l))
+                btn.pack(pady=5, padx=5, fill='x')
         if scroll_to_bottom:
             self.after(50, lambda: self.scroll_to_bottom())
         return bubble_frame
@@ -905,17 +921,12 @@ class ChatApp(ctk.CTk):
     def restore_window(self, icon=None, item=None):
 
         def _do_restore():
-            self.deiconify()
-            self.lift()
-            self.focus_force()
-            self.is_window_focused = True
-        self.after(0, _do_restore)
-
-    def restore_window(self, icon=None, item=None):
-
-        def _do_restore():
             now = time.time()
-            if self._last_hide_timestamp > 0 and now - self._last_hide_timestamp > self._LOCK_TIMEOUT:
+            should_lock = False
+            if self._LOCK_TIMEOUT > 0 and self._last_hide_timestamp > 0:
+                if now - self._last_hide_timestamp > self._LOCK_TIMEOUT:
+                    should_lock = True
+            if should_lock:
                 self._check_security_lock()
             else:
                 self._last_hide_timestamp = 0
@@ -1008,6 +1019,14 @@ class ChatApp(ctk.CTk):
         except Exception as e:
             print(f'Notification error: {e}')
 
+    def _filter_contact_list(self, event=None):
+        keyword = self.contact_search_entry.get().strip().lower()
+        self.refresh_ui(contact_keyword=keyword)
+
+    def _filter_chat_list(self, event=None):
+        keyword = self.chat_search_entry.get().strip().lower()
+        self.refresh_ui(chat_keyword=keyword)
+
     def _lazy_build_ui(self):
         if self.ui_is_ready:
             return
@@ -1021,8 +1040,14 @@ class ChatApp(ctk.CTk):
         self.tab_view.grid(row=1, column=0, padx=10, sticky='nsew')
         self.tab_chats = self.tab_view.add(tr('TAB_CHATS'))
         self.tab_contacts = self.tab_view.add(tr('TAB_CONTACTS'))
+        self.chat_search_entry = ctk.CTkEntry(self.tab_chats, placeholder_text=tr('SEARCH_PH'), height=30)
+        self.chat_search_entry.pack(fill='x', padx=5, pady=(5, 5))
+        self.chat_search_entry.bind('<KeyRelease>', self._filter_chat_list)
         self.scroll_chats = ctk.CTkScrollableFrame(self.tab_chats, fg_color='transparent')
         self.scroll_chats.pack(fill='both', expand=True)
+        self.contact_search_entry = ctk.CTkEntry(self.tab_contacts, placeholder_text=tr('PH_SEARCH_MEMBER'), height=30)
+        self.contact_search_entry.pack(fill='x', padx=5, pady=(5, 5))
+        self.contact_search_entry.bind('<KeyRelease>', self._filter_contact_list)
         self.scroll_contacts = ctk.CTkScrollableFrame(self.tab_contacts, fg_color='transparent')
         self.scroll_contacts.pack(fill='both', expand=True)
         self.profile_frame = ctk.CTkFrame(self.sidebar, height=80, corner_radius=0, fg_color='#2b2b2b', cursor='hand2')
@@ -1764,13 +1789,23 @@ class ChatApp(ctk.CTk):
         self.fingerprint_label.configure(text=fp_text)
         self.chat_title.configure(text=display_name)
 
-    def refresh_ui(self):
+    def refresh_ui(self, contact_keyword=None, chat_keyword=None):
         if not self.client:
             return
         now = time.time()
         if now - getattr(self, '_last_ui_refresh', 0) < 0.2:
             return
         self._last_ui_refresh = now
+        if contact_keyword is None and hasattr(self, 'contact_search_entry'):
+            try:
+                contact_keyword = self.contact_search_entry.get().strip().lower()
+            except:
+                pass
+        if chat_keyword is None and hasattr(self, 'chat_search_entry'):
+            try:
+                chat_keyword = self.chat_search_entry.get().strip().lower()
+            except:
+                pass
         my_nick_display = self._get_display_name(self.client.pk)
         self.my_name_label.configure(text=my_nick_display)
         my_avatar = self._get_avatar_from_cache(self.client.pk, size=(40, 40))
@@ -1780,13 +1815,12 @@ class ChatApp(ctk.CTk):
         else:
             self.my_avatar_label.configure(image=None, text='👤')
         sessions = self.client.db.get_session_list()
-        current_session_ids = set()
         all_friend_pks = {f['pubkey'] for f in self.client.db.get_friends()}
         from client_persistent import OFFICIAL_GROUP_CONFIG
         official_gid = OFFICIAL_GROUP_CONFIG['id']
+        chat_list_data = []
         for sess in sessions:
             sid = sess['id']
-            current_session_ids.add(sid)
             real_type = sess['type']
             if sid in all_friend_pks:
                 real_type = 'dm'
@@ -1821,33 +1855,43 @@ class ChatApp(ctk.CTk):
             if is_blocked:
                 display_text = f"{tr('STATUS_BLOCKED')} {display_text}"
                 item_text_color = 'gray'
-            unread_str = f"[{sess['unread']}] " if sess['unread'] > 0 else ''
-            full_tooltip_text = f'{unread_str}{display_text}'
-            if len(display_text) > 22:
-                display_text = display_text[:22] + '...'
-            final_text_for_list = f'{unread_str}{display_text}'
+            chat_list_data.append({'id': sid, 'name': sess['name'], 'display': display_text, 'color': item_text_color, 'unread': sess['unread'], 'type': real_type, 'raw_sess': sess})
+        if chat_keyword:
+            chat_list_data = [c for c in chat_list_data if chat_keyword in c['name'].lower() or chat_keyword in c['display'].lower() or chat_keyword in c['id'].lower()]
+        for widget in self.session_widgets.values():
+            widget.pack_forget()
+        visible_chat_ids = set()
+        for item in chat_list_data:
+            sid = item['id']
+            visible_chat_ids.add(sid)
             fg_color = 'gray25' if sid == self.current_chat_id else 'transparent'
+            unread_str = f"[{item['unread']}] " if item['unread'] > 0 else ''
+            full_tooltip = f"{unread_str}{item['display']}"
+            final_disp = item['display']
+            if len(final_disp) > 22:
+                final_disp = final_disp[:22] + '...'
+            final_text_for_list = f'{unread_str}{final_disp}'
             if sid in self.session_widgets:
                 btn = self.session_widgets[sid]
-                btn.configure(text=final_text_for_list, fg_color=fg_color, text_color=item_text_color)
+                btn.configure(text=final_text_for_list, fg_color=fg_color, text_color=item['color'])
                 if hasattr(btn, '_tooltip'):
-                    btn._tooltip.update_text(full_tooltip_text)
+                    btn._tooltip.update_text(full_tooltip)
                 else:
-                    btn._tooltip = Tooltip(btn, full_tooltip_text)
-                btn.pack_forget()
+                    btn._tooltip = Tooltip(btn, full_tooltip)
                 btn.pack(fill='x', pady=2)
             else:
-                btn = ctk.CTkButton(self.scroll_chats, text=final_text_for_list, anchor='w', fg_color=fg_color, hover_color='gray30', text_color=item_text_color, font=('Microsoft YaHei UI', 13), command=lambda s=sess, rt=real_type: self.switch_chat(s['id'], s['name'], rt))
+                btn = ctk.CTkButton(self.scroll_chats, text=final_text_for_list, anchor='w', fg_color=fg_color, hover_color='gray30', text_color=item['color'], font=('Microsoft YaHei UI', 13), command=lambda s=item['raw_sess'], rt=item['type']: self.switch_chat(s['id'], s['name'], rt))
                 btn.pack(fill='x', pady=2)
-                btn.bind('<Button-3>', lambda e, s=sess, rt=real_type, b=btn: self.on_right_click_item(e, s['id'], s['name'], rt, b))
-                btn._tooltip = Tooltip(btn, full_tooltip_text)
+                btn.bind('<Button-3>', lambda e, s=item['raw_sess'], rt=item['type'], b=btn: self.on_right_click_item(e, s['id'], s['name'], rt, b))
+                btn._tooltip = Tooltip(btn, full_tooltip)
                 self.session_widgets[sid] = btn
-        to_remove = []
+        real_chat_ids = {s['id'] for s in sessions}
+        to_remove_chats = []
         for sid, widget in self.session_widgets.items():
-            if sid not in current_session_ids:
+            if sid not in real_chat_ids:
                 widget.destroy()
-                to_remove.append(sid)
-        for sid in to_remove:
+                to_remove_chats.append(sid)
+        for sid in to_remove_chats:
             del self.session_widgets[sid]
         friends = self.client.db.get_friends()
         groups = self.client.db.get_all_groups()
@@ -1886,11 +1930,13 @@ class ChatApp(ctk.CTk):
                 disp = f"{tr('STATUS_BLOCKED')} {disp}"
                 c_color = 'gray'
             contact_list.append({'id': pk, 'name': c['name'] or '', 'display': disp, 'blocked': is_blk, 'color': c_color})
+        if contact_keyword:
+            contact_list = [c for c in contact_list if contact_keyword in c['name'].lower() or contact_keyword in c['id'].lower() or contact_keyword in c['display'].lower()]
         contact_list.sort(key=lambda x: x['name'])
-        current_contact_ids = set()
+        for widget in self.contact_widgets.values():
+            widget.pack_forget()
         for item in contact_list:
             cid = item['id']
-            current_contact_ids.add(cid)
             c_fg_color = 'gray25' if cid == self.current_chat_id else 'transparent'
             full_tooltip_text = item['display']
             final_disp = item['display']
@@ -1903,7 +1949,6 @@ class ChatApp(ctk.CTk):
                     btn._tooltip.update_text(full_tooltip_text)
                 else:
                     btn._tooltip = Tooltip(btn, full_tooltip_text)
-                btn.pack_forget()
                 btn.pack(fill='x', pady=2)
             else:
                 btn = ctk.CTkButton(self.scroll_contacts, text=final_disp, anchor='w', fg_color=c_fg_color, text_color=item['color'], hover_color='#404040', font=('Microsoft YaHei UI', 13), command=lambda i=item: self._on_contact_click(i))
@@ -1912,9 +1957,14 @@ class ChatApp(ctk.CTk):
                 btn.bind('<Button-3>', lambda e, i=item, b=btn: self.on_right_click_item(e, i['id'], i['name'], 'contact', b))
                 btn._tooltip = Tooltip(btn, full_tooltip_text)
                 self.contact_widgets[cid] = btn
+        real_contact_ids = set()
+        for g in groups:
+            real_contact_ids.add(g[0])
+        for c in friends:
+            real_contact_ids.add(c['pubkey'])
         to_remove_c = []
         for cid, widget in self.contact_widgets.items():
-            if cid not in current_contact_ids:
+            if cid not in real_contact_ids:
                 widget.destroy()
                 to_remove_c.append(cid)
         for cid in to_remove_c:
@@ -3226,32 +3276,15 @@ class ChatApp(ctk.CTk):
             if is_official:
                 info = {tr('INFO_KEY_NAME'): group_info['name'], tr('INFO_KEY_ID'): '-', tr('INFO_KEY_TYPE'): tr('INFO_VAL_OFFICIAL'), tr('INFO_KEY_DESC'): tr('INFO_VAL_OFFICIAL_DESC')}
             elif g_type == 1:
-                try:
-                    from hashlib import sha256
-                    from nacl.secret import SecretBox
-                    import base64
-                    checksum = self._calc_invite_checksum(cid, group_info['key_hex'], g_type)
-                    safe_name = base64.urlsafe_b64encode(group_info['name'].encode()).decode()
-                    raw_code = f"{cid}|{group_info['key_hex']}|{self.client.db.get_group_owner(cid) or ''}|{safe_name}|{g_type}|{checksum}"
-                    obfuscate_key = sha256('dagechat'.encode()).digest()
-                    box = SecretBox(obfuscate_key)
-                    encrypted = box.encrypt(raw_code.encode('utf-8'))
-                    b64_cipher = base64.urlsafe_b64encode(encrypted).decode('utf-8')
-                    display_code = f'dage://ghost/{b64_cipher}'
-                except:
-                    display_code = 'Error'
+                link, _ = self._generate_invite_link_content(cid)
+                display_code = link if link else 'Error'
                 info = {tr('INFO_KEY_NAME'): group_info['name'], tr('INFO_KEY_ID'): 'Ghost Group (Hidden)', tr('INFO_KEY_TYPE'): tr('INFO_VAL_GHOST'), tr('INFO_KEY_CODE_GHOST'): display_code}
             else:
-                try:
-                    import base64
-                    checksum = self._calc_invite_checksum(cid, group_info['key_hex'], g_type)
-                    safe_name = base64.urlsafe_b64encode(group_info['name'].encode()).decode()
-                    owner = self.client.db.get_group_owner(cid)
-                    raw_code = f"{cid}|{group_info['key_hex']}|{owner or ''}|{safe_name}|{g_type}|{checksum}"
-                    owner_disp = self.client._format_sender_info(owner) if owner else 'Unknown'
-                    info = {tr('INFO_KEY_NAME'): group_info['name'], tr('INFO_KEY_ID'): cid, tr('INFO_KEY_OWNER'): owner_disp, tr('INFO_KEY_CODE_NORMAL'): raw_code}
-                except:
-                    info = {tr('INFO_KEY_NAME'): group_info['name'], 'Error': 'Gen Code Failed'}
+                link, _ = self._generate_invite_link_content(cid)
+                display_code = link if link else 'Error'
+                owner = self.client.db.get_group_owner(cid)
+                owner_disp = self.client._format_sender_info(owner) if owner else 'Unknown'
+                info = {tr('INFO_KEY_NAME'): group_info['name'], tr('INFO_KEY_ID'): cid, tr('INFO_KEY_OWNER'): owner_disp, tr('INFO_KEY_CODE_NORMAL'): display_code}
             buttons = []
             if is_official:
                 is_blocked = self.client.db.is_group_blocked(cid)
@@ -3293,7 +3326,10 @@ class ChatApp(ctk.CTk):
             self.show_user_profile(cid)
 
     def open_ghost_invite_dialog(self, group_id):
-        if messagebox.askyesno(tr('DIALOG_GHOST_WARN_TITLE'), tr('DIALOG_GHOST_WARN_MSG'), icon='warning'):
+        target_parent = self
+        if hasattr(self, 'current_info_window') and self.current_info_window and self.current_info_window.winfo_exists():
+            target_parent = self.current_info_window
+        if messagebox.askyesno(tr('DIALOG_GHOST_WARN_TITLE'), tr('DIALOG_GHOST_WARN_MSG'), icon='warning', parent=target_parent):
             self.open_invite_dialog(group_id)
 
     def open_group_ban_manager(self, group_id=None):
@@ -3358,47 +3394,106 @@ class ChatApp(ctk.CTk):
         target_gid = group_id if group_id else self.current_chat_id
         if not target_gid:
             return
-        grp_info = self.client.groups.get(target_gid)
-        if not grp_info:
+        invite_link, invite_text = self._generate_invite_link_content(target_gid)
+        if not invite_text:
+            self.show_toast('生成邀请码失败')
             return
-        is_anon = str(grp_info.get('type')) == '1'
         all_friends = self.client.db.get_friends()
-        candidates = []
-        if is_anon:
-            candidates = [f for f in all_friends if f['pubkey'] != self.client.pk]
-        else:
-            members = set(self.client.db.get_group_members(target_gid))
-            candidates = []
-            for f in all_friends:
-                pk = f['pubkey']
-                if pk != self.client.pk and pk not in members:
-                    candidates.append(f)
+        candidates = [f for f in all_friends if f['pubkey'] != self.client.pk]
+        if not candidates:
+            self.show_toast('暂无好友可邀请')
+            return
+        from gui_windows import MultiSelectContactDialog
+        target_parent = self
+        if hasattr(self, 'current_info_window') and self.current_info_window and self.current_info_window.winfo_exists():
+            target_parent = self.current_info_window
 
         def _on_invite_confirm(selected_pks):
             if not selected_pks:
                 return
-            if is_anon:
-                warn_msg = f'⚠️ 您即将向 {len(selected_pks)} 位好友分享群密钥。\n\n请确认这些好友值得信赖。\n是否继续？'
-                if not messagebox.askyesno('安全警告', warn_msg):
-                    return
-
-            def _bg_batch_send():
-                success_count = 0
-                for pk in selected_pks:
-                    enc_key = self.client.db.get_contact_enc_key(pk)
-                    if enc_key:
-                        self.client.invite_user(target_gid, enc_key)
-                        success_count += 1
-                    else:
-                        self.client.fetch_user_profile(pk)
+            import time
+            from hashlib import sha256
+            count = 0
+            for pk in selected_pks:
+                enc_key = self.client.db.get_contact_enc_key(pk)
+                if enc_key:
+                    self.client.send_dm(pk, invite_text, enc_key)
+                    ts = int(time.time())
+                    msg_id = sha256(f'{ts}{pk}'.encode()).hexdigest()
+                    self.client.db.save_message(msg_id, pk, self.client.pk, invite_text, ts, True)
+                    count += 1
                     time.sleep(0.1)
-                self.show_toast(f'✅ 已发送 {success_count} 份邀请')
-            threading.Thread(target=_bg_batch_send, daemon=True).start()
-        from gui_windows import MultiSelectContactDialog
-        if not candidates and (not is_anon):
-            self.show_toast('提示: 您的好友都已经在群里了')
+            self.show_toast(f'✅ 已发送 {count} 份邀请链接')
+            if hasattr(self, 'current_info_window') and self.current_info_window and self.current_info_window.winfo_exists():
+                self.current_info_window.destroy()
+                self.current_info_window = None
+        MultiSelectContactDialog(target_parent, candidates, _on_invite_confirm)
+
+    def handle_dage_link(self, link):
+        import base64
+        from hashlib import sha256
+        from nacl.secret import SecretBox
+        if not link.startswith('dage://invite/'):
+            self.show_toast('❌ 无效的链接格式')
             return
-        MultiSelectContactDialog(self, candidates, _on_invite_confirm)
+        try:
+            parts = link.replace('dage://invite/', '').split('/')
+            if len(parts) < 2:
+                return
+            invite_type = parts[0]
+            payload = parts[1]
+            raw_str = ''
+            if invite_type == 'ghost':
+                ciphertext = base64.urlsafe_b64decode(payload)
+                obfuscate_key = sha256('dagechat'.encode()).digest()
+                box = SecretBox(obfuscate_key)
+                raw_str = box.decrypt(ciphertext).decode('utf-8')
+            elif invite_type == 'normal':
+                raw_str = base64.urlsafe_b64decode(payload).decode('utf-8')
+            else:
+                self.show_toast('❌ 未知的群组类型')
+                return
+            data_parts = raw_str.split('|')
+            if len(data_parts) < 6:
+                self.show_toast('❌ 链接数据损坏')
+                return
+            gid, key, owner, safe_name, g_type, checksum = data_parts[:6]
+            try:
+                group_name = base64.urlsafe_b64decode(safe_name).decode()
+            except:
+                group_name = 'Unknown Group'
+            if self._calc_invite_checksum(gid, key, int(g_type)) != checksum:
+                self.show_toast('❌ 链接校验失败 (可能被篡改)')
+                return
+            if gid in self.client.groups:
+                self.show_toast(f'您已经在群组【{group_name}】中了')
+                self.switch_chat(gid, group_name, 'group')
+                return
+            if not messagebox.askyesno('加入群聊', f'确定加入群组？\n\n名称: {group_name}\nID: {gid[:8]}...'):
+                return
+            self.client.db.save_group(gid, group_name, key, owner_pubkey=owner, group_type=int(g_type))
+            if str(g_type) == '1':
+                self.client.groups[gid] = {'name': group_name, 'key_hex': key, 'type': 1}
+                filter_obj = {'kinds': [1059], '#p': [gid], 'limit': 50}
+            else:
+                self.client.groups[gid] = {'name': group_name, 'key_hex': key, 'type': 0}
+                filter_obj = {'kinds': [42, 30078], '#g': [gid], 'limit': 50}
+            sub_id = f'sub_join_{gid[:8]}'
+            req_msg = json.dumps(['REQ', sub_id, filter_obj])
+
+            def _bg_task():
+                self.client.relay_manager.broadcast_send(req_msg)
+                self.client.sync_backup_to_cloud()
+                time.sleep(0.5)
+                if str(g_type) == '0':
+                    self.client.send_group_msg(gid, tr('GREETING_GROUP'))
+                self.after(0, lambda: self.refresh_ui())
+                self.after(0, lambda: self.switch_chat(gid, group_name, 'group'))
+                self.after(0, lambda: self.show_toast(f'✅ 成功加入: {group_name}'))
+            threading.Thread(target=_bg_task, daemon=True).start()
+        except Exception as e:
+            print(f'Link parse error: {e}')
+            self.show_toast(f'❌ 链接解析错误: {e}')
 
     def process_invite(self, pubkey, manual=False):
         target_gid = getattr(self, '_invite_target_gid', self.current_chat_id)
@@ -3424,6 +3519,37 @@ class ChatApp(ctk.CTk):
             self.client.fetch_user_profile(pubkey)
             self.show_toast(tr('TOAST_SYNCING'))
         self.invite_window = None
+
+    def _generate_invite_link_content(self, gid):
+        if gid not in self.client.groups:
+            return (None, None)
+        grp_info = self.client.groups[gid]
+        g_name = grp_info['name']
+        g_key = grp_info['key_hex']
+        g_type = grp_info.get('type', 0)
+        owner = self.client.db.get_group_owner(gid)
+        import base64
+        from hashlib import sha256
+        from nacl.secret import SecretBox
+        checksum = self._calc_invite_checksum(gid, g_key, g_type)
+        safe_name = base64.urlsafe_b64encode(g_name.encode()).decode()
+        raw_data = f"{gid}|{g_key}|{owner or ''}|{safe_name}|{g_type}|{checksum}"
+        invite_link = ''
+        try:
+            if str(g_type) == '1':
+                obfuscate_key = sha256('dagechat'.encode()).digest()
+                box = SecretBox(obfuscate_key)
+                encrypted = box.encrypt(raw_data.encode('utf-8'))
+                b64_payload = base64.urlsafe_b64encode(encrypted).decode('utf-8')
+                invite_link = f'dage://invite/ghost/{b64_payload}'
+            else:
+                b64_payload = base64.urlsafe_b64encode(raw_data.encode('utf-8')).decode('utf-8')
+                invite_link = f'dage://invite/normal/{b64_payload}'
+        except Exception as e:
+            print(f'Gen link error: {e}')
+            return (None, None)
+        invite_text = f'邀请加入群聊【{g_name}】\n点击下方链接或复制加入：\n{invite_link}'
+        return (invite_link, invite_text)
 
     def create_group_dialog(self):
         from gui_windows import MultiSelectContactDialog
@@ -3475,33 +3601,52 @@ class ChatApp(ctk.CTk):
             is_ghost = is_ghost_var.get()
             selected_pks = self._temp_selected_members
             if is_ghost and selected_pks:
-                if not messagebox.askyesno(tr('DIALOG_GHOST_WARN_TITLE'), tr('DIALOG_GHOST_CREATE_WARN').format(n=len(selected_pks)), parent=dialog, icon='warning'):
+                warn_msg = f'⚠️ 安全警告：共享密钥群\n\n您即将向 {len(selected_pks)} 位好友发送包含【群私钥】的邀请链接。\n私钥一旦发出无法撤回。请确保这些好友绝对值得信赖。\n\n确定要发送吗？'
+                if not messagebox.askyesno('风险确认', warn_msg, parent=dialog, icon='warning'):
                     return
             dialog.destroy()
-            gid = self.client.create_group(name, is_ghost=is_ghost)
-            time.sleep(0.2)
-            if not is_ghost:
-                self.client.send_group_msg(gid, tr('GREETING_GROUP_CREATE'))
-            if selected_pks:
+            self.show_toast(f'⏳ 正在创建【{name}】...', duration=2000)
 
-                def _bg_batch_invite():
-                    success_count = 0
-                    for pk in selected_pks:
-                        enc_key = self.client.db.get_contact_enc_key(pk)
-                        if enc_key:
-                            self.client.invite_user(gid, enc_key)
-                            success_count += 1
+            def _bg_task():
+                try:
+                    gid = self.client.create_group(name, is_ghost=is_ghost)
+                    time.sleep(0.5)
+                    self.gui_queue.put(('refresh', None))
+                    time.sleep(0.5)
+                    if not is_ghost:
+                        self.client.send_group_msg(gid, tr('GREETING_GROUP_CREATE'))
+                        time.sleep(0.2)
+                    invite_count = 0
+                    if selected_pks:
+                        link, invite_txt = self._generate_invite_link_content(gid)
+                        if invite_txt:
+                            for pk in selected_pks:
+                                enc_key = self.client.db.get_contact_enc_key(pk)
+                                if enc_key:
+                                    self.client.send_dm(pk, invite_txt, enc_key)
+                                    ts = int(time.time())
+                                    from hashlib import sha256
+                                    msg_id = sha256(f'{ts}{pk}{gid}'.encode()).hexdigest()
+                                    self.client.db.save_message(msg_id, pk, self.client.pk, invite_txt, ts, True)
+                                    invite_count += 1
+                                else:
+                                    self.client.fetch_user_profile(pk)
+                                time.sleep(0.1)
+
+                    def _finish():
+                        if is_ghost:
+                            self.show_toast(tr('TOAST_CREATE_GHOST').format(id=gid[:8]))
                         else:
-                            self.client.fetch_user_profile(pk)
-                        time.sleep(0.1)
-                    self.show_toast(tr('TOAST_CREATE_AND_INVITE').format(n=success_count))
-                threading.Thread(target=_bg_batch_invite, daemon=True).start()
-            elif is_ghost:
-                self.show_toast(tr('TOAST_CREATE_GHOST').format(id=gid[:8]))
-            else:
-                self.show_toast(tr('TOAST_CREATE_NORMAL').format(name=name))
-            self.refresh_ui()
-            self.switch_chat(gid, name, 'group')
+                            msg = tr('TOAST_CREATE_NORMAL').format(name=name)
+                            if invite_count > 0:
+                                msg += f'\n(已发送 {invite_count} 份邀请)'
+                            self.show_toast(msg)
+                        self.switch_chat(gid, name, 'group')
+                    self.after(0, _finish)
+                except Exception as e:
+                    print(f'Create group error: {e}')
+                    self.after(0, lambda: messagebox.showerror(tr('DIALOG_ERROR_TITLE'), f'Failed: {e}'))
+            threading.Thread(target=_bg_task, daemon=True).start()
         ctk.CTkButton(tab_create, text=tr('BTN_CREATE_NOW'), command=_do_create, fg_color='green').pack(side='bottom', pady=20)
         tab_join = tab_view.add(tr('TAB_JOIN_GROUP'))
         ctk.CTkLabel(tab_join, text=tr('LBL_PASTE_CODE'), font=('Microsoft YaHei UI', 12)).pack(pady=(20, 5))
@@ -3512,10 +3657,15 @@ class ChatApp(ctk.CTk):
             inp = entry_code.get().strip()
             if not inp:
                 return
+            if inp.startswith('dage://invite/'):
+                dialog.destroy()
+                self.handle_dage_link(inp)
+                return
             dialog.destroy()
             raw_invite_str = inp
             if inp.startswith('dage://ghost/'):
                 try:
+                    import base64
                     from hashlib import sha256
                     from nacl.secret import SecretBox
                     b64_content = inp.split('dage://ghost/')[1]
@@ -3538,6 +3688,7 @@ class ChatApp(ctk.CTk):
                 group_name = f'Group{gid[:6]}'
                 if parts[3]:
                     try:
+                        import base64
                         group_name = base64.urlsafe_b64decode(parts[3]).decode()
                     except:
                         group_name = parts[3]
@@ -3546,25 +3697,26 @@ class ChatApp(ctk.CTk):
                     g_type = int(parts[4])
                 except:
                     pass
-                provided_sum = parts[5]
-                calculated_sum = self._calc_invite_checksum(gid, key, g_type)
-                if provided_sum != calculated_sum:
+                if self._calc_invite_checksum(gid, key, g_type) != parts[5]:
                     return messagebox.showerror(tr('DIALOG_WARN_TITLE'), 'Checksum Failed', parent=self)
                 self.client.db.save_group(gid, group_name, key, owner_pubkey=owner, group_type=g_type)
-                req_msg = json.dumps(['REQ', gid])
                 if g_type == 1:
                     self.client.groups[gid] = {'name': group_name, 'key_hex': key, 'type': 1}
                 else:
                     self.client.groups[gid] = {'name': group_name, 'key_hex': key, 'type': 0}
+                sub_id = f'sub_join_{gid[:8]}'
+                filter_obj = {}
+                if g_type == 1:
+                    filter_obj = {'kinds': [1059], '#p': [gid], 'limit': 50}
+                else:
+                    filter_obj = {'kinds': [42, 30078], '#g': [gid], 'limit': 50}
+                req_msg = json.dumps(['REQ', sub_id, filter_obj])
                 if owner:
                     self.client.db.add_group_member(gid, owner, role='owner')
                     self.client.db.add_group_member(gid, self.client.pk)
 
                 def _bg_join_task():
-                    with self.client.lock:
-                        for url, worker in self.client.relays.items():
-                            if worker.is_connected():
-                                worker.send(req_msg)
+                    self.client.relay_manager.broadcast_send(req_msg)
                     self.client.sync_backup_to_cloud()
                     time.sleep(0.5)
                     if g_type == 0:
