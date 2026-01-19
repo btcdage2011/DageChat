@@ -51,7 +51,7 @@ if False:
     import gui_viewer
     import nacl
     import coincurve
-APP_VERSION = 'v0.5.6'
+APP_VERSION = 'v0.5.7'
 APP_BUILD_NAME = f'DageChat Beta {APP_VERSION}'
 APP_AUMID = f'DageTech.DageChat.Client.{APP_VERSION}'
 
@@ -536,6 +536,7 @@ class ChatApp(ctk.CTk):
             quote_frame.bind('<Button-3>', lambda e, rid=reply_to_id: self.show_quote_context_menu(e, rid))
             orig_msg = self.client.db.get_message(reply_to_id)
             q_text = '🔒 Orig Msg Locked'
+            q_image_obj = None
             if orig_msg:
                 o_pk = orig_msg[2]
                 o_name = 'User'
@@ -551,12 +552,36 @@ class ChatApp(ctk.CTk):
                         if js.get('type') == 'history':
                             disp_c = f"[聊天记录] {js.get('title', 'History')}"
                         else:
-                            disp_c = js.get('text', '') or '[Image]'
+                            disp_c = js.get('text', '')
+                            if js.get('image'):
+                                try:
+                                    img_bytes = base64.b64decode(js['image'])
+                                    pil_img = Image.open(BytesIO(img_bytes))
+                                    max_w = 256
+                                    max_h = 150
+                                    img_w, img_h = pil_img.size
+                                    ratio = min(max_w / img_w, max_h / img_h)
+                                    if ratio < 1.0:
+                                        new_w = int(img_w * ratio)
+                                        new_h = int(img_h * ratio)
+                                    else:
+                                        new_w, new_h = (img_w, img_h)
+                                    q_image_obj = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(new_w, new_h))
+                                    if not disp_c:
+                                        disp_c = ''
+                                except Exception as e:
+                                    if not disp_c:
+                                        disp_c = '[Image]'
                     except:
                         pass
                 if len(disp_c) > 50:
                     disp_c = disp_c[:50] + '...'
                 q_text = f'{o_name}: {disp_c}'
+            if q_image_obj:
+                q_img_label = ctk.CTkLabel(quote_frame, text='', image=q_image_obj)
+                q_img_label.image = q_image_obj
+                q_img_label.pack(side='left', padx=5, pady=2)
+                q_img_label.bind('<Button-3>', lambda e, rid=reply_to_id: self.show_quote_context_menu(e, rid))
             q_label = ctk.CTkLabel(quote_frame, text=q_text, text_color=quote_text_color, font=('Microsoft YaHei UI', 11, 'italic'), wraplength=250)
             q_label.pack(side='left', padx=5)
             q_label.bind('<Button-3>', lambda e, rid=reply_to_id: self.show_quote_context_menu(e, rid))
@@ -2935,18 +2960,25 @@ class ChatApp(ctk.CTk):
                     if image_b64:
                         img_bytes = base64.b64decode(image_b64)
                         pil_img = Image.open(BytesIO(img_bytes))
-                        max_side = 100
-                        ratio = 1.0
-                        if pil_img.width > pil_img.height:
-                            ratio = max_side / pil_img.width
+                        max_w = 256
+                        max_h = 150
+                        img_w, img_h = pil_img.size
+                        ratio = min(max_w / img_w, max_h / img_h)
+                        if ratio < 1.0:
+                            new_w = int(img_w * ratio)
+                            new_h = int(img_h * ratio)
                         else:
-                            ratio = max_side / pil_img.height
-                        new_w, new_h = (int(pil_img.width * ratio), int(pil_img.height * ratio))
+                            new_w, new_h = (img_w, img_h)
                         thumb_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(new_w, new_h))
-                except:
-                    pass
-        short_text = text_preview[:20] + '...' if len(text_preview) > 20 else text_preview
-        self.reply_label.configure(text=f'回复: {short_text}')
+                except Exception as e:
+                    print(f'Reply image preview error: {e}')
+        final_text = text_preview
+        if thumb_img:
+            if final_text in ['[Image]', '[图片]', tr('SEARCH_RES_IMG')]:
+                final_text = ''
+        short_text = final_text[:20] + '...' if len(final_text) > 20 else final_text
+        label_text = f'回复: {short_text}' if short_text else '回复:'
+        self.reply_label.configure(text=label_text)
         if thumb_img:
             self.reply_thumb_label.configure(image=thumb_img, width=thumb_img._size[0])
             self.reply_thumb_label.image = thumb_img
