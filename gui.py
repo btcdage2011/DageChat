@@ -2463,7 +2463,7 @@ class ChatApp(ctk.CTk):
             is_grp = self.current_chat_type == 'group'
             self.client.mark_session_read(self.current_chat_id, is_grp)
             if not is_me:
-                if not self.is_window_focused or is_at_me:
+                if not self.is_window_focused:
                     self.show_system_notification(data)
         elif not is_me:
             target_sid = incoming_group_id if incoming_group_id else data.get('sender_pk')
