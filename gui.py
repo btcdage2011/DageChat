@@ -51,7 +51,7 @@ if False:
     import gui_viewer
     import nacl
     import coincurve
-APP_VERSION = 'v0.5.7'
+APP_VERSION = 'v0.5.8'
 APP_BUILD_NAME = f'DageChat Beta {APP_VERSION}'
 APP_AUMID = f'DageTech.DageChat.Client.{APP_VERSION}'
 

@@ -41,12 +41,12 @@ class BackupManager:
     def _derive_key(self, salt):
         return NostrCrypto.derive_backup_key(self.client.priv_k, salt)
 
-    def run_backup(self, filepath, target_gid, progress_cb):
+    def run_backup(self, filepath, target_gid, progress_cb, include_messages=True):
         temp_file = filepath + '.tmp'
         try:
             self.cancel_event.clear()
             progress_cb(0, tr('BKP_STEP_PREPARE'))
-            raw_data = self.client.db.get_backup_data(target_gid)
+            raw_data = self.client.db.get_backup_data(target_gid, include_messages=include_messages)
             count_msg = len(raw_data.get('messages', []))
             count_contact = len(raw_data.get('contacts', []))
             if self.cancel_event.is_set():

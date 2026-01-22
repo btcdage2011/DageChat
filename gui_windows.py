@@ -1620,15 +1620,7 @@ class SettingsWindow(SafeToplevel):
         ctk.CTkButton(frame, text=tr('BTN_EXPORT_PLAIN'), height=30, width=200, fg_color='#555', command=lambda: ExportSelectionDialog(self.parent_app, target_id=None, target_name='All_Plain')).pack(pady=20)
 
     def do_backup_global(self):
-        from datetime import datetime
-        default_name = f"DageChat_Backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.dgbk"
-        path = ctk.filedialog.asksaveasfilename(parent=self, defaultextension='.dgbk', initialfile=default_name, title=tr('TITLE_SAVE_BACKUP'), filetypes=[('DageChat Backup', '*.dgbk')])
-        if not path:
-            return
-        from backup_manager import BackupManager
-        manager = BackupManager(self.parent_app.client)
-        from gui_windows import TaskProgressWindow
-        TaskProgressWindow(self.parent_app, tr('BKP_TITLE'), BackupManager.run_backup, manager, path, None, toast_master=self)
+        BackupTypeDialog(self, self.parent_app.client)
 
     def do_restore_global(self):
         path = ctk.filedialog.askopenfilename(parent=self, title=tr('TITLE_SELECT_BACKUP'), filetypes=[('DageChat Backup', '*.dgbk')])
@@ -2129,6 +2121,46 @@ class ChangePasswordDialog(SafeToplevel):
             self.destroy()
         else:
             messagebox.showerror(tr('DIALOG_ERROR_TITLE'), msg, parent=self)
+
+class BackupTypeDialog(SafeToplevel):
+
+    def __init__(self, parent_window, client):
+        super().__init__(parent_window)
+        self.client = client
+        self.parent_window = parent_window
+        self.title(tr('BKP_BTN_START'))
+        self.center_window(350, 200)
+        self.resizable(False, False)
+        self.attributes('-topmost', True)
+        self.grab_set()
+        ctk.CTkLabel(self, text='请选择要备份的内容:', font=('Microsoft YaHei UI', 12)).pack(pady=(20, 15))
+        btn_contacts = ctk.CTkButton(self, text='👤 仅备份联系人 (Contacts Only)', fg_color='#333', width=280, command=lambda: self.start_backup(False))
+        btn_contacts.pack(pady=5)
+        btn_full = ctk.CTkButton(self, text='📦 全量备份 (Full Backup)', fg_color='#1F6AA5', width=280, command=lambda: self.start_backup(True))
+        btn_full.pack(pady=5)
+        ctk.CTkButton(self, text=tr('BTN_CANCEL'), fg_color='transparent', text_color='gray', command=self.destroy).pack(pady=5)
+
+    def start_backup(self, include_messages):
+        self.destroy()
+        from datetime import datetime
+        import re
+        my_pk = self.client.pk
+        raw_nick = self.client.db.get_contact_name(my_pk) or 'User'
+        safe_nick = re.sub('[\\\\/*?:"<>|]', '_', raw_nick).strip()
+        if not safe_nick:
+            safe_nick = 'User'
+        time_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+        default_name = f'DageChat_Backup_{safe_nick}_{time_str}.dgbk'
+        path = ctk.filedialog.asksaveasfilename(parent=self.parent_window, defaultextension='.dgbk', initialfile=default_name, title=tr('TITLE_SAVE_BACKUP'), filetypes=[('DageChat Backup', '*.dgbk')])
+        if not path:
+            return
+        from backup_manager import BackupManager
+        manager = BackupManager(self.client)
+
+        def _task_wrapper(filepath, target_gid, progress_cb):
+            return manager.run_backup(filepath, target_gid, progress_cb, include_messages=include_messages)
+        mode_str = '全量' if include_messages else '仅联系人'
+        TaskProgressWindow(self.parent_window.parent_app, f"{tr('BKP_TITLE')} ({mode_str})", _task_wrapper, path, None, toast_master=self.parent_window)
 
 class TaskProgressWindow(SafeToplevel):
 

@@ -702,27 +702,28 @@ class DageDB:
             finally:
                 cursor.close()
 
-    def get_backup_data(self, target_gid=None):
+    def get_backup_data(self, target_gid=None, include_messages=True):
         with self.lock:
             cursor = self.conn.cursor()
             data = {'contacts': [], 'groups': [], 'members': [], 'messages': []}
             try:
-                print(f"📦 [Backup] Starting data extraction (Target: {(target_gid if target_gid else 'Global')})...")
+                print(f"📦 [Backup] Starting data extraction (Target: {(target_gid if target_gid else 'Global')}, msgs={include_messages})...")
                 relevant_pks = set()
-                sql_msg = 'SELECT * FROM messages'
-                params_msg = []
-                if target_gid:
-                    sql_msg += ' WHERE group_id = ?'
-                    params_msg.append(target_gid)
-                    relevant_pks.add(target_gid)
-                cursor.execute(sql_msg, tuple(params_msg))
-                msgs = []
-                for r in cursor.fetchall():
-                    msgs.append(r)
-                    relevant_pks.add(r[2])
-                    if r[1]:
-                        relevant_pks.add(r[1])
-                data['messages'] = msgs
+                if include_messages:
+                    sql_msg = 'SELECT * FROM messages'
+                    params_msg = []
+                    if target_gid:
+                        sql_msg += ' WHERE group_id = ?'
+                        params_msg.append(target_gid)
+                        relevant_pks.add(target_gid)
+                    cursor.execute(sql_msg, tuple(params_msg))
+                    msgs = []
+                    for r in cursor.fetchall():
+                        msgs.append(r)
+                        relevant_pks.add(r[2])
+                        if r[1]:
+                            relevant_pks.add(r[1])
+                    data['messages'] = msgs
                 sql_grp = 'SELECT * FROM groups'
                 params_grp = []
                 if target_gid:
