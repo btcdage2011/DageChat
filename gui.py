@@ -51,7 +51,7 @@ if False:
     import gui_viewer
     import nacl
     import coincurve
-APP_VERSION = 'v0.5.8'
+APP_VERSION = 'v0.5.9'
 APP_BUILD_NAME = f'DageChat Beta {APP_VERSION}'
 APP_AUMID = f'DageTech.DageChat.Client.{APP_VERSION}'
 
@@ -1011,6 +1011,7 @@ class ChatApp(ctk.CTk):
             return
         gid = msg_data.get('group_id')
         is_at_me = msg_data.get('is_at_me', False)
+        from client_persistent import OFFICIAL_GROUP_CONFIG
         if gid == OFFICIAL_GROUP_CONFIG['id'] and (not is_at_me):
             return
         msg_ts = msg_data.get('time', 0)
@@ -1039,10 +1040,20 @@ class ChatApp(ctk.CTk):
             nickname = msg_data.get('nickname', 'User')
             title = tr('NOTIFY_TITLE_NEW')
             msg_text = f"{prefix}{tr('NOTIFY_CONTENT_DM').format(name=nickname)}"
-        try:
-            self.tray_icon.notify(msg_text, title)
-        except Exception as e:
-            print(f'Notification error: {e}')
+        cfg = self.client.ui_settings
+        allow_bubble = cfg.get('notify_bubble', True)
+        allow_sound = cfg.get('notify_sound', False)
+        if allow_bubble:
+            try:
+                self.tray_icon.notify(msg_text, title)
+            except Exception as e:
+                print(f'Notification error: {e}')
+        elif allow_sound:
+            try:
+                import winsound
+                winsound.MessageBeep()
+            except:
+                pass
 
     def _filter_contact_list(self, event=None):
         keyword = self.contact_search_entry.get().strip().lower()

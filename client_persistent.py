@@ -345,6 +345,20 @@ class PersistentChatUser:
         except Exception as e:
             print(f'❌ [Config] Load error: {e}, using defaults.')
         print(f"✅ [System] Config loaded (JSON Mode). Relays: {len(self.network_config['relays'])}")
+        self.ui_settings_file = os.path.join(db_folder, 'settings.json')
+        self.ui_settings = {'notify_bubble': True, 'notify_sound': False}
+        try:
+            if os.path.exists(self.ui_settings_file):
+                with open(self.ui_settings_file, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        data = json.loads(content)
+                        if isinstance(data, dict):
+                            self.ui_settings.update(data)
+            else:
+                self.save_ui_settings(True, False)
+        except Exception as e:
+            print(f'❌ [Config] UI Settings load error: {e}')
         self.relay_manager = AsyncRelayManager(self.on_message, self)
         self.groups = {}
         from collections import deque
@@ -355,6 +369,17 @@ class PersistentChatUser:
         self.priv_k = None
         self.enc_pk = None
         self.on_relay_status_callback = None
+
+    def save_ui_settings(self, notify_bubble, notify_sound):
+        self.ui_settings['notify_bubble'] = bool(notify_bubble)
+        self.ui_settings['notify_sound'] = bool(notify_sound)
+        try:
+            with open(self.ui_settings_file, 'w', encoding='utf-8') as f:
+                json.dump(self.ui_settings, f, indent=4)
+            return True
+        except Exception as e:
+            print(f'❌ Write UI settings error: {e}')
+            return False
 
     def _save_config_to_disk(self):
         try:

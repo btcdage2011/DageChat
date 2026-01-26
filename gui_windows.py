@@ -1546,8 +1546,23 @@ class SettingsWindow(SafeToplevel):
 
     def _init_privacy_tab(self):
         frame = self.tab_priv
+        notify_frame = ctk.CTkFrame(frame, fg_color='transparent')
+        notify_frame.pack(fill='x', padx=20, pady=(20, 10))
+        ctk.CTkLabel(notify_frame, text=tr('LBL_NOTIFY_SETTING'), font=('Microsoft YaHei UI', 12, 'bold')).pack(anchor='w', pady=5)
+        current_bubble = True
+        current_sound = False
+        if self.parent_app.client:
+            current_bubble = self.parent_app.client.ui_settings.get('notify_bubble', True)
+            current_sound = self.parent_app.client.ui_settings.get('notify_sound', False)
+        self.var_bubble = ctk.BooleanVar(value=current_bubble)
+        self.var_sound = ctk.BooleanVar(value=current_sound)
+        cb_bubble = ctk.CTkCheckBox(notify_frame, text=tr('CB_NOTIFY_BUBBLE'), variable=self.var_bubble, command=self.save_notify_settings)
+        cb_bubble.pack(anchor='w', pady=5)
+        cb_sound = ctk.CTkCheckBox(notify_frame, text=tr('CB_NOTIFY_SOUND'), variable=self.var_sound, command=self.save_notify_settings)
+        cb_sound.pack(anchor='w', pady=5)
+        ctk.CTkFrame(frame, height=2, fg_color='#444').pack(fill='x', padx=10, pady=10)
         sec_frame = ctk.CTkFrame(frame, fg_color='transparent')
-        sec_frame.pack(fill='x', padx=20, pady=(20, 10))
+        sec_frame.pack(fill='x', padx=20, pady=(10, 10))
         ctk.CTkLabel(sec_frame, text=tr('SETTING_LBL_TIMEOUT'), font=('Microsoft YaHei UI', 12)).pack(anchor='w', pady=5)
         input_row = ctk.CTkFrame(sec_frame, fg_color='transparent')
         input_row.pack(fill='x')
@@ -1571,6 +1586,15 @@ class SettingsWindow(SafeToplevel):
         self.block_scroll.pack(fill='both', expand=True, padx=5, pady=5)
         ctk.CTkButton(frame, text=tr('BTN_REFRESH'), command=self.load_block_list).pack(pady=5)
         self.load_block_list()
+
+    def save_notify_settings(self):
+        b = self.var_bubble.get()
+        s = self.var_sound.get()
+        if self.parent_app.client:
+            if self.parent_app.client.save_ui_settings(b, s):
+                pass
+            else:
+                self.parent_app.show_toast('设置保存失败')
 
     def open_change_pwd(self):
         ChangePasswordDialog(self.parent_app)
