@@ -1,0 +1,11 @@
+aiohttp
+certifi
+coincurve
+cryptography
+Kivy>=2.2.0
+kivymd>=1.1.1
+opencv-python
+Pillow
+plyer
+PyNaCl
+qrcode[pil]
