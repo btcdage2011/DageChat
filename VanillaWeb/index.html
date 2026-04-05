@@ -2566,7 +2566,11 @@ Disclaimer / 免责声明:
           isOfficial = pk === OFFICIAL_GROUP.id,
           displayName = prof.name;
         if (pk === pubKeyHex ? displayName = `${prof.name || "我"} (备忘录 💾)` : isGroup && 1 === prof.type ? displayName = `[共享群] ${prof.name}` : isGroup && isOfficial ? displayName = `[测试频道] ${prof.name}` : isGroup && (displayName = `[加密群] ${prof.name}`),
-          filterText && !displayName.toLowerCase().includes(filterText) && !pk.toLowerCase().includes(filterText)) return;
+          filterText) {
+          let safeName = String(displayName || "").toLowerCase(),
+            safePk = String(pk || "").toLowerCase();
+          if (!safeName.includes(filterText) && !safePk.includes(filterText)) return;
+        }
         let msgs = messages[pk] || [],
           lastMsgTime = msgs.length > 0 ? msgs[msgs.length - 1].time : 0,
           unread = unreadCounts[pk] || 0;
