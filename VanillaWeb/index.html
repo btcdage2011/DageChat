@@ -1,17 +1,3 @@
-<!--
-Project:   DageChat (Nostr Protocol Client Research)
-Author:    @BTCDage
-Nostr:     npub17ahz4xa3hvkvvhh4wguzzqknp8p7l5nyzzqc3z53uq538r5qgn0q40z7pw
-License:   MIT License
-Source:    https://github.com/btcdage2011/DageChat
-Disclaimer / 免责声明:
-1. This software is for technical research, cryptography study, and protocol testing purposes only.
-   本软件仅供计算机网络技术研究、密码学学习及协议测试使用。
-2. The author assumes no liability for any misuse of this software.
-   作者不对使用本软件产生的任何后果负责。
-3. Illegal use of this software is strictly prohibited.
-   严禁将本软件用于任何违反当地法律法规的用途。
--->
 <!DOCTYPE html>
 <html lang="zh-CN">
 
@@ -27,6 +13,8 @@ Disclaimer / 免责声明:
   </script>
   <script src="js/nostr.bundle.js"></script>
   <script src="js/sodium.js"></script>
+  <script src="js/qrcode.min.js"></script>
+  <script src="js/html5-qrcode.min.js"></script>
   <style>
     .no-scrollbar::-webkit-scrollbar {
       display: none
@@ -64,6 +52,15 @@ Disclaimer / 免责声明:
       animation: highlight-flash 2.5s ease-out forwards;
       border-radius: 8px
     }
+
+    .bubble-text {
+      word-break: break-word;
+      overflow-wrap: anywhere
+    }
+
+    .pull-to-refresh {
+      transition: transform 0.2s ease-out
+    }
   </style>
 </head>
 
@@ -73,7 +70,7 @@ Disclaimer / 免责声明:
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.40</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.47</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -151,9 +148,15 @@ Disclaimer / 免责声明:
             </div>
           </div>
         </div>
-        <div class="flex space-x-2 shrink-0">
-          <button onclick="manualLock()" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 active:bg-gray-100 dark:bg-gray-950 shadow-sm">锁定</button>
-          <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 border border-red-200 rounded-lg bg-white dark:bg-gray-900 active:bg-red-50 shadow-sm">注销</button>
+        <div class="flex space-x-1.5 shrink-0 items-center">
+          <button onclick="startQrScan()" title="扫码添加" class="p-1.5 text-gray-500 hover:text-blue-600 transition active:scale-95"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+            </svg></button>
+          <button onclick="softReloadNetwork()" title="软重连网络" class="p-1.5 text-gray-500 hover:text-green-600 transition active:scale-95"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg></button>
+          <button onclick="manualLock()" class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 active:bg-gray-100 dark:bg-gray-950 shadow-sm ml-1">锁定</button>
+          <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 px-2 py-1.5 border border-red-200 rounded-lg bg-white dark:bg-gray-900 active:bg-red-50 shadow-sm">注销</button>
         </div>
       </div>
 
@@ -376,6 +379,7 @@ Disclaimer / 免责声明:
       <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 md:hidden"></div>
       <div class="p-2 space-y-1">
         <button onclick="doAction('reply')" class="w-full py-4 text-gray-800 dark:text-gray-100 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center font-medium">↩️ 回复</button>
+        <button onclick="doAction('forward')" class="w-full py-4 text-gray-800 dark:text-gray-100 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center font-medium">↪️ 转发</button>
         <div class="h-[1px] bg-gray-100 dark:bg-gray-950 my-1"></div>
         <button onclick="doAction('copy')" class="w-full py-4 text-gray-800 dark:text-gray-100 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center font-medium">📄 复制</button>
         <button onclick="doAction('select_copy')" class="w-full py-4 text-gray-800 dark:text-gray-100 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center font-medium">✂️ 选择复制</button>
@@ -457,7 +461,8 @@ Disclaimer / 免责声明:
           <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">我的公钥 (发给朋友添加你)</label>
           <div class="flex">
             <input type="text" id="my-npub-display" readonly class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-gray-100 dark:bg-gray-950 text-gray-500 dark:text-gray-400 font-mono text-xs overflow-hidden outline-none">
-            <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 rounded-r-lg text-sm border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
+            <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 text-sm border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
+            <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value)" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg text-lg border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">📱</button>
           </div>
         </div>
         <div class="flex space-x-3">
@@ -525,7 +530,8 @@ Disclaimer / 免责声明:
           <div class="flex">
             <input type="password" id="my-nsec-display" readonly value="••••••••••••••" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-red-50 text-red-600 font-mono text-xs overflow-hidden outline-none">
             <button onclick="actionWithPasswordVerification('toggleKey')" id="btn-toggle-key" class="bg-gray-100 dark:bg-gray-950 hover:bg-gray-200 text-gray-700 dark:text-gray-200 px-3 text-sm border-t border-b border-gray-300 dark:border-gray-600 transition font-medium">显示</button>
-            <button onclick="actionWithPasswordVerification('copyKey')" class="bg-red-500 hover:bg-red-600 text-white px-3 rounded-r-lg text-sm border border-l-0 border-red-500 transition font-medium whitespace-nowrap">复制</button>
+            <button onclick="actionWithPasswordVerification('copyKey')" class="bg-red-500 hover:bg-red-600 text-white px-3 text-sm border border-l-0 border-red-500 transition font-medium whitespace-nowrap">复制</button>
+            <button onclick="actionWithPasswordVerification('showQrKey')" class="bg-red-600 hover:bg-red-700 text-white px-3 rounded-r-lg text-lg border border-l-0 border-red-500 transition font-medium whitespace-nowrap">📱</button>
           </div>
         </div>
       </div>
@@ -817,6 +823,49 @@ Disclaimer / 免责声明:
   </div>
 
 
+  <div id="qr-scan-modal" class="fixed inset-0 bg-black bg-opacity-90 hidden z-[200] flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-2xl">
+      <div class="p-3 bg-gray-50 dark:bg-gray-800 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+        <h3 class="font-bold text-gray-800 dark:text-gray-100">📷 扫码</h3>
+        <button onclick="stopQrScan()" class="text-gray-500 hover:text-red-500 p-1"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg></button>
+      </div>
+      <div id="qr-reader" class="w-full bg-black" style="min-height: 300px;"></div>
+    </div>
+  </div>
+
+
+  <div id="qr-display-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-[200] flex items-center justify-center p-4" onclick="if(event.target===this) this.classList.add('hidden')">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full">
+      <h3 id="qr-display-title" class="text-lg font-bold text-gray-800 mb-4">扫一扫</h3>
+      <div id="qr-display-canvas" class="bg-white p-2 rounded shadow-sm"></div>
+      <p id="qr-display-desc" class="text-xs text-gray-500 mt-4 text-center break-all w-full"></p>
+      <button onclick="document.getElementById('qr-display-modal').classList.add('hidden')" class="mt-5 bg-blue-600 text-white px-6 py-2 rounded-lg font-bold w-full">关闭</button>
+    </div>
+  </div>
+
+
+  <div id="session-action-modal" class="fixed inset-0 bg-black bg-opacity-40 hidden z-[70] flex flex-col justify-end md:justify-center md:items-center transition-opacity" onclick="closeSessionActionModal(event)">
+    <div id="session-action-content" class="bg-white dark:bg-gray-900 w-full md:w-80 rounded-t-2xl md:rounded-2xl pb-safe transform transition-transform translate-y-full md:translate-y-0 shadow-2xl">
+      <div class="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-2 md:hidden"></div>
+      <div class="p-4 text-center border-b border-gray-100 dark:border-gray-800">
+        <span id="session-action-name" class="font-bold text-gray-800 dark:text-gray-100 text-base truncate block">Session</span>
+      </div>
+      <div class="p-2 space-y-1">
+        <button id="btn-session-pin" onclick="doSessionAction('pin')" class="w-full py-4 text-gray-800 dark:text-gray-100 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center font-medium">📌 置顶 / 取消置顶</button>
+        <div class="h-[1px] bg-gray-100 dark:bg-gray-950 my-1"></div>
+        <button onclick="doSessionAction('hide')" class="w-full py-4 text-orange-500 text-[17px] active:bg-orange-50 dark:active:bg-gray-950 rounded-lg text-center font-medium">👁️ 不显示该聊天 (来消息恢复)</button>
+        <div class="h-[1px] bg-gray-100 dark:bg-gray-950 my-1"></div>
+        <button onclick="doSessionAction('delete')" class="w-full py-4 text-red-500 text-[17px] active:bg-red-50 dark:active:bg-gray-950 rounded-lg text-center font-medium">🗑️ 删除该聊天 (清空记录)</button>
+        <div class="h-[1px] bg-gray-100 dark:bg-gray-950 my-1"></div>
+        <button onclick="closeSessionActionModal()" class="w-full py-4 text-gray-500 dark:text-gray-400 text-[17px] active:bg-gray-100 dark:bg-gray-950 rounded-lg text-center">取消</button>
+      </div>
+    </div>
+  </div>
+
+
+
   <script>
     let nt, privKeyHex = null,
       pubKeyHex = null,
@@ -855,6 +904,10 @@ Disclaimer / 免责声明:
       replyTargetId = null,
       pendingMentions = {},
       mentionCounts = {},
+      pinnedChats = new Set,
+      hiddenChats = new Set,
+      currentSessionActionPk = null,
+      html5QrCode = null,
       isBrowserActive = !0,
       originalTitle = document.title,
       titleBlinkTimer = null,
@@ -1242,8 +1295,8 @@ Disclaimer / 免责声明:
       }
     }
 
-    async function makeGiftWrap(myPriv, targetPub, contentStr, kind = 14, extraTags = []) {
-      let now = Math.floor(Date.now() / 1e3),
+    async function makeGiftWrap(myPriv, targetPub, contentStr, kind = 14, extraTags = [], forcedTs = null) {
+      let now = forcedTs || Math.floor(Date.now() / 1e3),
         myPub = nt.getPublicKey(myPriv),
         rumor = {
           pubkey: myPub,
@@ -1521,7 +1574,8 @@ Disclaimer / 免责声明:
       "toggleKey" === pendingAction ? (skInput.value = realNsec, skInput.type = "text",
           btnToggle.innerText = "隐藏") : "copyKey" === pendingAction ? (copyText(realNsec),
           alert("私钥已复制！请妥善保管！"), skInput.value = "••••••••••••••", skInput.type = "password",
-          btnToggle.innerText = "显示") : "exportChat" === pendingAction && executeExport(),
+          btnToggle.innerText = "显示") : "exportChat" === pendingAction ? executeExport() : "showQrKey" === pendingAction && (showQrCode("私钥二维码 (绝密，打死不给别人看)", realNsec),
+          skInput.value = "••••••••••••••", skInput.type = "password", btnToggle.innerText = "显示"),
         pendingAction = null;
     }
 
@@ -1565,7 +1619,8 @@ Disclaimer / 免责声明:
               } catch (e) {}
               delete lightProfiles[pk].picture;
             }
-          saveEncryptedData("profiles_cache", lightProfiles), saveEncryptedData("contacts_cache", contacts);
+          saveEncryptedData("profiles_cache", lightProfiles), saveEncryptedData("contacts_cache", contacts),
+            saveEncryptedData("pinned_chats", Array.from(pinnedChats)), saveEncryptedData("hidden_chats", Array.from(hiddenChats));
         } catch (e) {
           console.error("Cache sync error:", e);
         }
@@ -1664,7 +1719,11 @@ Disclaimer / 免责声明:
       accInfo && accInfo.name && !profiles[pubKeyHex]?.name && (profiles[pubKeyHex] || (profiles[pubKeyHex] = {}),
         profiles[pubKeyHex].name = accInfo.name, publishEvent(0, JSON.stringify({
           name: accInfo.name
-        })).catch(() => {})), "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
+        })).catch(() => {}));
+      let pArr = await loadEncryptedData("pinned_chats", []);
+      pinnedChats = new Set(pArr);
+      let hArr = await loadEncryptedData("hidden_chats", []);
+      hiddenChats = new Set(hArr), "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
         name: OFFICIAL_GROUP.name,
         key_hex: OFFICIAL_GROUP.key,
         type: OFFICIAL_GROUP.type,
@@ -1699,27 +1758,35 @@ Disclaimer / 免责声明:
                   console.log(`✅ [Relay] 已连接: ${url} (${relayStates[url].ping}ms)`), updateRelayStatusUI(),
                   reconnectTimers[url] && clearInterval(reconnectTimers[url]);
                 let ghostGids = Object.keys(groups).filter(gid => 1 === groups[gid].type),
-                  normalGids = Object.keys(groups).filter(gid => 0 === groups[gid].type);
+                  normalGids = Object.keys(groups).filter(gid => 0 === groups[gid].type),
+                  maxTs = 0;
+                for (let pk in messages)
+                  if (messages[pk].length > 0) {
+                    let latest = messages[pk][messages[pk].length - 1].time;
+                    latest > maxTs && (maxTs = latest);
+                  }
+                let filterBase = {};
+                maxTs > 0 ? (filterBase.since = maxTs - 172800, filterBase.limit = 50) : filterBase.limit = 50;
                 const req = ["REQ", "sub-" + Date.now(), {
                   kinds: [0, 5],
                   authors: [pubKeyHex]
                 }, {
                   kinds: [4, 5, 1059],
                   "#p": [pubKeyHex],
-                  limit: 30
+                  ...filterBase
                 }, {
                   kinds: [4, 5],
                   authors: [pubKeyHex],
-                  limit: 30
+                  ...filterBase
                 }];
                 ghostGids.length > 0 && req.push({
                   kinds: [5, 1059],
                   "#p": ghostGids,
-                  limit: 30
+                  ...filterBase
                 }), normalGids.length > 0 && req.push({
                   kinds: [5, 42, 30078],
                   "#g": normalGids,
-                  limit: 30
+                  ...filterBase
                 }), ws.send(JSON.stringify(req)), ws.send(JSON.stringify(["REQ", "sync3-" + Date.now(), {
                   kinds: [3],
                   authors: [pubKeyHex],
@@ -2220,7 +2287,8 @@ Disclaimer / 免责声明:
             txtToCopy = parsed.isHistory ? "[聊天记录]" : parsed.text || "[图片]";
           "copy" === type ? (copyText(txtToCopy), alert("已复制！")) : openSelectCopyModal(txtToCopy);
         }
-      } else "reply" === type && startReply(id);
+      } else "reply" === type ? startReply(id) : "forward" === type && (selectedMsgIds.clear(),
+        selectedMsgIds.add(id), openForwardModal("single"));
     }
 
     function startReply(msgId) {
@@ -2263,7 +2331,7 @@ Disclaimer / 免责声明:
         btn.className = "w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50",
           btn.innerHTML = `<div class="w-10 h-10 rounded-full ${bgColor} text-white flex items-center justify-center font-bold mr-3">${icon}</div>\n                                                 <span class="text-sm font-medium text-gray-800 dark:text-gray-100">${escapeHTML(name)}</span>`,
           btn.onclick = () => {
-            "merge" === forwardMode ? confirmMergeForward(pk) : confirmStepForward(pk);
+            confirm(`确定要${"merge" === forwardMode ? "合并转发" : "step" === forwardMode ? "逐条转发" : "转发"}到 ${name} 吗？`) && ("merge" === forwardMode ? confirmMergeForward(pk) : confirmStepForward(pk));
           }, listDiv.appendChild(btn);
       }), document.getElementById("forward-modal").classList.remove("hidden"), ModalManager.push("forward", closeForwardModal);
     }
@@ -2576,7 +2644,8 @@ Disclaimer / 免责声明:
           unread = unreadCounts[pk] || 0;
         if ("chats" === currentSidebarTab) {
           if (0 === msgs.length && 0 === unread && pk !== currentChatPk && pk !== pubKeyHex && !isOfficial) return;
-        } else if (isStranger && 0 === msgs.length) return;
+          if (hiddenChats.has(pk) && 0 === unread && pk !== currentChatPk) return;
+        } else if (isStranger) return;
         renderList.push({
           pk: pk,
           isGroup: isGroup,
@@ -2588,7 +2657,13 @@ Disclaimer / 免责声明:
           lastMsgTime: lastMsgTime,
           unread: unread
         });
-      }), "chats" === currentSidebarTab ? renderList.sort((a, b) => b.lastMsgTime - a.lastMsgTime) : renderList.sort((a, b) => {
+      }), "chats" === currentSidebarTab ? renderList.sort((a, b) => {
+        if (a.pk === pubKeyHex) return -1;
+        if (b.pk === pubKeyHex) return 1;
+        let aPin = pinnedChats.has(a.pk) ? 1 : 0,
+          bPin = pinnedChats.has(b.pk) ? 1 : 0;
+        return aPin !== bPin ? bPin - aPin : b.lastMsgTime - a.lastMsgTime;
+      }) : renderList.sort((a, b) => {
         if (a.pk === pubKeyHex) return -1;
         if (b.pk === pubKeyHex) return 1;
         if (a.isOfficial) return -1;
@@ -2622,13 +2697,32 @@ Disclaimer / 免责声明:
         if ("chats" === currentSidebarTab) {
           let rawLastMsg = msgs.length > 0 ? msgs[msgs.length - 1].text : isGroup ? "暂无群消息..." : "暂无消息...",
             parsedLast = parseMessageContent(rawLastMsg),
-            displayLast = void 0 !== parsedLast.text && "" !== parsedLast.text ? parsedLast.text : parsedLast.imageB64 ? "[图片]" : rawLastMsg,
-            cleanLastMsg = String(displayLast || "").substring(0, 20);
+            displayLast = rawLastMsg;
+          displayLast = parsedLast.isHistory && parsedLast.historyData ? "[聊天记录] " + (parsedLast.historyData.title || "") : void 0 !== parsedLast.text && "" !== parsedLast.text ? parsedLast.text : parsedLast.imageB64 ? "[图片]" : rawLastMsg;
+          let cleanLastMsg = String(displayLast || "").substring(0, 20);
           subTitleHtml = `<div class="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">${(mentionCounts[pk] || 0) > 0 ? '<span class="text-red-500 font-bold">[有人@我]</span> ' : ""}${escapeHTML(cleanLastMsg)}</div>`;
         } else {
-          subTitleHtml = `<div class="text-[11px] text-gray-400 truncate mt-1 font-mono">${isGroup ? 1 === prof.type ? "高度匿名的共享群组" : "端到端加密群组" : isStranger ? "未添加为联系人" : "已添加的好友"}</div>`;
+          subTitleHtml = `<div class="text-[11px] text-gray-400 truncate mt-1 font-mono">${isGroup ? 1 === prof.type ? "高度匿名的共享群组" : "端到端加密群组" : isStranger ? "未添加为联系人" : pk === pubKeyHex ? "自己的备忘录 💾" : "已添加的好友"}</div>`;
         }
-        div.innerHTML = `${avatarHtml}<div class="flex-1 min-w-0"><div class="font-medium text-gray-800 dark:text-gray-100 text-sm truncate leading-tight">${escapeHTML(displayName)}${strangerBadge}</div>${subTitleHtml}</div>`,
+        let isPinned = pinnedChats.has(pk) || pk === pubKeyHex,
+          pinBadge = isPinned ? '<span class="ml-auto text-[10px] text-gray-400">📌</span>' : "",
+          baseBg = isPinned ? "bg-gray-100 dark:bg-gray-800/50" : "bg-transparent";
+        if (div.className = "p-3 flex items-center space-x-3 cursor-pointer border-b border-gray-100 dark:border-gray-800 transition " + (isCurrent ? "bg-blue-50 dark:bg-gray-800 border-l-4 border-blue-500" : `${baseBg} hover:bg-gray-50 dark:hover:bg-gray-800 border-l-4 border-transparent active:bg-gray-100 dark:active:bg-gray-950`),
+          div.onclick = () => selectContact(pk), pk !== pubKeyHex) {
+          let pressTimer = null;
+          div.oncontextmenu = e => {
+            e.preventDefault(), openSessionActionModal(pk, displayName);
+          }, div.ontouchstart = e => {
+            pressTimer = setTimeout(() => {
+              openSessionActionModal(pk, displayName);
+            }, 600);
+          }, div.ontouchend = () => {
+            clearTimeout(pressTimer);
+          }, div.ontouchmove = () => {
+            clearTimeout(pressTimer);
+          };
+        }
+        div.innerHTML = `${avatarHtml}<div class="flex-1 min-w-0 flex flex-col"><div class="flex items-center w-full"><div class="font-medium text-gray-800 dark:text-gray-100 text-sm truncate leading-tight">${escapeHTML(displayName)}${strangerBadge}</div>${pinBadge}</div>${subTitleHtml}</div>`,
           list.appendChild(div);
       }), 0 === renderList.length && (list.innerHTML = '<div class="text-center text-xs text-gray-400 mt-10">列表为空</div>');
     }
@@ -2693,7 +2787,15 @@ Disclaimer / 免责声明:
               topTip.innerText = "--- 以上还有更多历史记录 ---", list.appendChild(topTip);
           }
         } else displayMsgs = msgs.length > 100 ? msgs.slice(-100) : msgs;
-      } else displayMsgs = msgs.length > 100 ? msgs.slice(-100) : msgs;
+      } else {
+        let renderLimit = Math.max(100, msgs.length);
+        if (displayMsgs = msgs.length > renderLimit ? msgs.slice(-renderLimit) : msgs, msgs.length > 0) {
+          let loadMoreBtn = document.createElement("div");
+          loadMoreBtn.id = "load-more-btn-" + currentChatPk, loadMoreBtn.className = "text-center text-xs font-bold text-blue-600 my-4 cursor-pointer hover:underline active:scale-95 transition-transform bg-blue-50 dark:bg-gray-800 dark:text-blue-400 py-2 rounded-lg mx-auto w-48 shadow-sm",
+            loadMoreBtn.innerText = "⬆️ 从网络拉取更早的消息", loadMoreBtn.onclick = () => loadMoreHistoryFromNetwork(currentChatPk),
+            list.appendChild(loadMoreBtn);
+        }
+      }
       if (displayMsgs.forEach(m => {
           if (blocklist.has(m.sender)) return;
           let parsed = parseMessageContent(m.text),
@@ -2717,16 +2819,18 @@ Disclaimer / 免责声明:
           if (m.reply_to_id) {
             let orig = msgs.find(x => x.id === m.reply_to_id),
               origText = "未知消息",
-              origName = "用户";
+              origName = "用户",
+              quoteImgHtml = "";
             if (orig) {
               let op = parseMessageContent(orig.text);
               origText = op.isHistory ? "[聊天记录]" : op.text || (op.imageB64 ? "[图片]" : "未知"), origName = orig.sender === pubKeyHex ? "我" : profiles[orig.sender]?.name || "用户",
-                origText.length > 25 && (origText = origText.substring(0, 25) + "...");
+                origText.length > 25 && (origText = origText.substring(0, 25) + "..."), op.imageB64 && (quoteImgHtml = `<img src="data:image/jpeg;base64,${op.imageB64}" class="h-8 w-8 object-cover rounded mr-2 inline-block shadow-sm">`,
+                  "[图片]" === origText && (origText = ""));
             }
             let quoteBorderColor = isMe ? "border-blue-300 text-blue-100" : "border-gray-400 text-gray-500 dark:text-gray-400",
               safeOrigName = escapeHTML(origName),
               safeOrigText = escapeHTML(origText);
-            quoteHtml = `<div class="mb-1.5 p-1.5 rounded bg-black bg-opacity-10 border-l-2 ${quoteBorderColor} text-[12px] cursor-pointer hover:opacity-80 transition" onclick="jumpToMessage(currentChatPk, '${m.reply_to_id}')">\n                      <span class="font-bold">${safeOrigName}:</span> ${safeOrigText}\n                  </div>`;
+            quoteHtml = `<div class="mb-1.5 p-1.5 rounded bg-black bg-opacity-10 border-l-2 ${quoteBorderColor} text-[12px] cursor-pointer hover:opacity-80 transition flex items-center" onclick="jumpToMessage(currentChatPk, '${m.reply_to_id}')">\n                      ${quoteImgHtml}\n                      <div class="min-w-0 flex-1 truncate"><span class="font-bold">${safeOrigName}:</span> ${safeOrigText}</div>\n                  </div>`;
           }
           let contentHtml = "";
           if (parsed.isHistory) {
@@ -2766,7 +2870,7 @@ Disclaimer / 免责声明:
               quoteHtml = "";
           }
           let timeColorClass = isMe ? "text-blue-200" : isTargetMe ? "text-red-400" : "text-gray-400",
-            bubbleHtml = `\n                  <div class="flex flex-col flex-1 ${isMe ? "items-end" : "items-start"} no-select"\n                      ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                      ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                      oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                      ${senderNameHtml}\n                      <div class="max-w-[75%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                          ${quoteHtml}\n                          <div class="text-[15px] whitespace-pre-wrap break-words leading-relaxed">${contentHtml}</div>\n                          <div class="text-[11px] text-right mt-1.5 ${timeColorClass}">${timeStr}</div>\n                      </div>\n                  </div>\n              `;
+            bubbleHtml = `\n                  <div class="flex flex-col flex-1 ${isMe ? "items-end" : "items-start"} no-select"\n                      ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                      ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                      oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                      ${senderNameHtml}\n                      <div class="max-w-[75%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                          ${quoteHtml}\n                          <div class="text-[15px] whitespace-pre-wrap bubble-text leading-relaxed max-h-[50vh] overflow-y-auto no-scrollbar">${contentHtml}</div>\n                          <div class="text-[11px] text-right mt-1.5 ${timeColorClass}">${timeStr}</div>\n                      </div>\n                  </div>\n              `;
           wrapper.innerHTML = selectHtml + bubbleHtml, list.appendChild(wrapper);
         }), isLocateMode) {
         let targetIdx = msgs.findIndex(m => m.id === targetMsgId);
@@ -2974,12 +3078,12 @@ Disclaimer / 免责声明:
               wrapEvent: wrapEvent,
               rumorId: rumorId,
               rumorEvent: rumorEvent
-            } = await makeGiftWrap(privKeyHex, currentChatPk, payloadStr, 14, tags);
+            } = await makeGiftWrap(privKeyHex, currentChatPk, payloadStr, 14, tags, nowTs);
             if (broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])), currentChatPk !== pubKeyHex) {
-              let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, payloadStr, 14, tags);
+              let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, payloadStr, 14, tags, nowTs);
               broadcastToRelays(JSON.stringify(["EVENT", selfWrap.wrapEvent]));
             }
-            messages[currentChatPk] || (messages[currentChatPk] = []), messages[currentChatPk].push({
+            messages[currentChatPk] || (messages[currentChatPk] = []), messages[currentChatPk].find(m => m.id === rumorId) || messages[currentChatPk].push({
               id: rumorId,
               sender: pubKeyHex,
               text: payloadStr,
@@ -3031,7 +3135,7 @@ Disclaimer / 免责声明:
           displayName = prof.name,
           displayId = isGroup ? "群组 ID / 公钥" : "Npub 公钥",
           displayPubkeyText = targetPk;
-        targetPk === pubKeyHex ? displayName = `${prof.name || "我"} (备忘录 💾)` : isGroup || (displayPubkeyText = nt.nip19.npubEncode(targetPk)),
+        targetPk === pubKeyHex ? (displayName = `${prof.name || "我"} (备忘录 💾)`, displayPubkeyText = nt.nip19.npubEncode(targetPk)) : isGroup || (displayPubkeyText = nt.nip19.npubEncode(targetPk)),
           document.getElementById("peer-modal-name").innerText = displayName || "未知", document.getElementById("peer-modal-pubkey-label").innerText = displayId,
           document.getElementById("peer-modal-pubkey").innerText = displayPubkeyText, isGroup || broadcastToRelays(JSON.stringify(["REQ", "fetch-live-profile-" + Date.now(), {
             kinds: [0],
@@ -3247,8 +3351,9 @@ Disclaimer / 免责声明:
       let fmt = document.querySelector('input[name="export-format"]:checked').value,
         exportData = "",
         nowStr = formatDateStr(Math.floor(Date.now() / 1e3)),
-        sessionsToExport = exportTargetId ? [exportTargetId] : Object.keys(messages);
-      exportData += "html" === fmt ? `<html><head><meta charset='utf-8'><style>\n                    body {
+        sessionsToExport = [];
+      sessionsToExport = exportTargetId ? [exportTargetId] : Object.keys(messages).filter(id => id === pubKeyHex || contacts.includes(id) || !!groups[id]),
+        exportData += "html" === fmt ? `<html><head><meta charset='utf-8'><style>\n                    body {
   font-family: 'Segoe UI','Microsoft YaHei',sans-serif;
   background: #f5f5f5;
   padding: 20px;
@@ -3640,7 +3745,196 @@ Disclaimer / 免责声明:
         document.getElementById("theme-toggle-btn").innerText = "🌙 切换暗色"), localStorage.setItem("dage_theme", theme);
     }
 
-    window.addEventListener("DOMContentLoaded", initTheme);
+    function showQrCode(title, content) {
+      document.getElementById("qr-display-title").innerText = title, document.getElementById("qr-display-desc").innerText = content,
+        document.getElementById("qr-display-canvas").innerHTML = "", new QRCode(document.getElementById("qr-display-canvas"), {
+          text: content,
+          width: 256,
+          height: 256,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        }), document.getElementById("qr-display-modal").classList.remove("hidden");
+    }
+
+    function startQrScan() {
+      document.getElementById("qr-scan-modal").classList.remove("hidden"), html5QrCode || (html5QrCode = new Html5Qrcode("qr-reader"),
+        html5QrCode.start({
+          facingMode: "environment"
+        }, {
+          fps: 10,
+          qrbox: {
+            width: 250,
+            height: 250
+          }
+        }, (decodedText, decodedResult) => {
+          stopQrScan(), handleScanResult(decodedText);
+        }, errorMessage => {}).catch(err => {
+          alert("未检测到摄像头或未获得权限，请在系统设置中允许浏览器访问摄像头。\n详细信息：" + err), stopQrScan();
+        }));
+    }
+
+    function stopQrScan() {
+      if (document.getElementById("qr-scan-modal").classList.add("hidden"), html5QrCode) try {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear(), html5QrCode = null;
+        }).catch(e => {
+          html5QrCode.clear(), html5QrCode = null;
+        });
+      } catch (e) {
+        html5QrCode = null;
+      }
+    }
+
+    async function handleScanResult(text) {
+      if (text.startsWith("dage://invite/")) await joinGroup(text);
+      else if (text.startsWith("npub1") || /^[0-9a-f]{64}$/i.test(text)) {
+        showPeerProfileModal(text.startsWith("npub") ? nt.nip19.decode(text).data : text);
+      } else alert("识别结果不被支持：" + text);
+    }
+
+    function softReloadNetwork() {
+      if (!pubKeyHex || isLocked) return;
+      for (let url in wsPool) wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close());
+      wsPool = {};
+      for (let url in reconnectTimers) clearTimeout(reconnectTimers[url]);
+      reconnectTimers = {};
+      let statusDot = document.getElementById("relay-status");
+      statusDot && (statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 mr-1.5 shadow-sm shrink-0");
+      let displayEl = document.getElementById("current-relay-display"),
+        oldText = displayEl.innerText;
+      displayEl.innerText = "🔄 正在重连同步...", setTimeout(() => {
+        "🔄 正在重连同步..." === displayEl.innerText && (displayEl.innerText = oldText);
+      }, 2e3), initRelayConnection();
+    }
+
+    function loadMoreHistoryFromNetwork(chatPk) {
+      let msgs = messages[chatPk] || [];
+      if (0 === msgs.length) return;
+      let oldestTs = msgs[0].time,
+        isGroup = !!groups[chatPk],
+        isGhost = isGroup && 1 === groups[chatPk].type,
+        subId = "history-" + chatPk.substring(0, 6) + "-" + Date.now(),
+        req = ["REQ", subId];
+      isGroup ? isGhost ? req.push({
+        kinds: [1059],
+        "#p": [chatPk],
+        until: oldestTs,
+        limit: 50
+      }) : req.push({
+        kinds: [5, 42],
+        "#g": [chatPk],
+        until: oldestTs,
+        limit: 50
+      }) : (req.push({
+        kinds: [4, 5, 1059],
+        "#p": [pubKeyHex],
+        until: oldestTs,
+        limit: 50
+      }), req.push({
+        kinds: [4, 5],
+        authors: [pubKeyHex],
+        "#p": [chatPk],
+        until: oldestTs,
+        limit: 50
+      })), broadcastToRelays(JSON.stringify(req));
+      let btn = document.getElementById("load-more-btn-" + chatPk);
+      btn && (btn.innerText = "⏳ 正在拉取中继网络..."), setTimeout(() => {
+        broadcastToRelays(JSON.stringify(["CLOSE", subId])), btn && (btn.innerText = "⬆️ 再次向网络获取更早的消息");
+      }, 5e3);
+    }
+
+    setInterval(() => {
+      if (pubKeyHex && !isLocked)
+        for (let url in wsPool) {
+          let ws = wsPool[url];
+          ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(["REQ", "PING_TEST", {
+            limit: 0
+          }]));
+        }
+    }, 3e4), document.addEventListener("visibilitychange", () => {
+      if ("visible" === document.visibilityState && pubKeyHex && !isLocked) {
+        initRelayConnection();
+        let safeNow = Math.floor(Date.now() / 1e3) - 600,
+          ghostGids = Object.keys(groups).filter(gid => 1 === groups[gid].type),
+          normalGids = Object.keys(groups).filter(gid => 0 === groups[gid].type);
+        const req = ["REQ", "wakeup-sync-" + Date.now(), {
+          kinds: [4, 5, 1059],
+          "#p": [pubKeyHex],
+          since: safeNow
+        }];
+        ghostGids.length > 0 && req.push({
+          kinds: [1059],
+          "#p": ghostGids,
+          since: safeNow
+        }), normalGids.length > 0 && req.push({
+          kinds: [5, 42],
+          "#g": normalGids,
+          since: safeNow
+        }), broadcastToRelays(JSON.stringify(req));
+      }
+    });
+
+    let pStart = {
+        x: 0,
+        y: 0
+      },
+      pCurrent = {
+        x: 0,
+        y: 0
+      },
+      pIsPulling = !1;
+
+    const contactsListEl = document.getElementById("contacts-list");
+
+    function openSessionActionModal(pk, name) {
+      currentSessionActionPk = pk, document.getElementById("session-action-name").innerText = name,
+        document.getElementById("btn-session-pin").innerText = pinnedChats.has(pk) ? "❌ 取消置顶" : "📌 置顶 (或取消)",
+        document.getElementById("session-action-modal").classList.remove("hidden"), setTimeout(() => {
+          document.getElementById("session-action-content").classList.remove("translate-y-full");
+        }, 10), ModalManager.push("sessionAction", closeSessionActionModal);
+    }
+
+    function closeSessionActionModal(eOrFromPopState) {
+      if (eOrFromPopState && "object" == typeof eOrFromPopState && eOrFromPopState.target && eOrFromPopState.target !== document.getElementById("session-action-modal")) return;
+      let isPopState = !0 === eOrFromPopState;
+      document.getElementById("session-action-content").classList.add("translate-y-full"),
+        setTimeout(() => {
+          document.getElementById("session-action-modal").classList.add("hidden");
+        }, 200), isPopState || ModalManager.pop("sessionAction");
+    }
+
+    function doSessionAction(action) {
+      let pk = currentSessionActionPk;
+      pk && ("pin" === action ? pinnedChats.has(pk) ? pinnedChats.delete(pk) : pinnedChats.add(pk) : "hide" === action ? confirm("确定不显示该聊天吗？\n当对方发来新消息时，会自动恢复显示。") && (hiddenChats.add(pk),
+          currentChatPk === pk && closeChat(new Event("close"))) : "delete" === action && confirm("确定要删除该聊天吗？\n所有本地记录将被彻底清空。") && (clearCurrentChatHistoryForHide(pk),
+          hiddenChats.add(pk), currentChatPk === pk && closeChat(new Event("close"))), syncLocalEncryptedCache(),
+        renderContacts(), closeSessionActionModal());
+    }
+
+    function clearCurrentChatHistoryForHide(pk) {
+      (messages[pk] || []).forEach(m => hiddenMsgsSet.add(m.id)), messages[pk] = [], unreadCounts[pk] = 0;
+    }
+
+    contactsListEl.addEventListener("touchstart", e => {
+      0 === contactsListEl.scrollTop && (pStart.y = e.touches[0].clientY, pIsPulling = !0,
+        contactsListEl.classList.remove("pull-to-refresh"));
+    }, {
+      passive: !0
+    }), contactsListEl.addEventListener("touchmove", e => {
+      if (!pIsPulling) return;
+      pCurrent.y = e.touches[0].clientY;
+      let dy = pCurrent.y - pStart.y;
+      dy > 0 && 0 === contactsListEl.scrollTop && (contactsListEl.style.transform = `translateY(${Math.min(dy / 2, 80)}px)`);
+    }, {
+      passive: !0
+    }), contactsListEl.addEventListener("touchend", e => {
+      if (!pIsPulling) return;
+      pIsPulling = !1;
+      let dy = pCurrent.y - pStart.y;
+      contactsListEl.classList.add("pull-to-refresh"), contactsListEl.style.transform = "",
+        dy > 120 && 0 === contactsListEl.scrollTop && softReloadNetwork();
+    }), window.addEventListener("DOMContentLoaded", initTheme);
   </script>
 </body>
 
