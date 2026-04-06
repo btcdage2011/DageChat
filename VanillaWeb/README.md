@@ -49,11 +49,3 @@
 
 **方法二：部署到静态服务器**
 直接将本文件夹推送到 GitHub Pages、Vercel、Netlify 或任何 Nginx 服务器的根目录下，无需任何 `build` 编译步骤。
-
-## 📂 目录结构 (Structure)
-
-```text
-VanillaWeb/
-├── index.html            # 核心业务逻辑、UI 渲染与事件路由
-├── js/*.js               # 各种协议库、加密库
-└── README.md             # 本说明文件
