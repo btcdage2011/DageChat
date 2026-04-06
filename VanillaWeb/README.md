@@ -55,7 +55,5 @@
 ```text
 VanillaWeb/
 ├── index.html            # 核心业务逻辑、UI 渲染与事件路由
-├── js/
-│   ├── nostr.bundle.js   # Nostr 协议底层工具库 (nostr-tools)
-│   └── sodium.js         # WebAssembly 加密库 (libsodium)
+├── js/*.js               # 各种协议库、加密库
 └── README.md             # 本说明文件
