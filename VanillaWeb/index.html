@@ -7872,7 +7872,7 @@ Disclaimer / 免责声明:
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.57</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.58</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8733,7 +8733,7 @@ Disclaimer / 免责声明:
       if (privKeyHex && pubKeyHex) try {
         await saveEncryptedData("unread_counts", unreadCounts), await saveEncryptedData("last_read_watermarks", lastReadWatermarks),
           await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps), await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)),
-          await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet));
+          await saveEncryptedData("deleted_groups", Array.from(deletedGroups)), await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet));
       } catch (e) {}
     }
 
@@ -8742,8 +8742,18 @@ Disclaimer / 免责声明:
       hiddenMsgsSet = new Set,
       clearedChatTimestamps = {},
       deletedContacts = new Set,
+      deletedGroups = new Set,
+      isCloudSyncing = !0,
       isSelectMode = !1,
-      selectedMsgIds = new Set,
+      _cloudSyncDebounceTimer = null;
+
+    function triggerCloudSync() {
+      _cloudSyncDebounceTimer && clearTimeout(_cloudSyncDebounceTimer), _cloudSyncDebounceTimer = setTimeout(() => {
+        syncBackupToCloud().catch(e => console.error("Cloud sync error:", e)), _cloudSyncDebounceTimer = null;
+      }, 2e3);
+    }
+
+    let selectedMsgIds = new Set,
       touchTimer = null,
       currentActionMsgId = null,
       currentActionIsMe = !1,
@@ -9029,7 +9039,7 @@ Disclaimer / 免责声明:
     }
 
     async function syncBackupToCloud() {
-      if (!privKeyHex || !pubKeyHex) return;
+      if (!privKeyHex || !pubKeyHex || isCloudSyncing) return;
       let groupsList = Object.keys(groups).map(gid => {
           let g = groups[gid];
           return {
@@ -9049,7 +9059,13 @@ Disclaimer / 免责声明:
           contacts: contactsList,
           blocklist: Array.from(blocklist),
           relays: currentRelayUrls,
-          ts: Math.floor(Date.now() / 1e3)
+          ts: Math.floor(Date.now() / 1e3),
+          _dage_ext: {
+            deleted_contacts: Array.from(deletedContacts),
+            deleted_groups: Array.from(deletedGroups),
+            cleared_ts: clearedChatTimestamps,
+            hidden_msgs: Array.from(hiddenMsgsSet).slice(-2e3)
+          }
         }),
         cipher = await pythonNip44Encrypt(privKeyHex, pubKeyHex, payload),
         tags = [
@@ -9302,10 +9318,11 @@ Disclaimer / 免责声明:
     }
 
     function deleteAccount(e, pk) {
-      e.stopPropagation(), confirm("确定要从本机移除该账号吗？(本地历史消息记录也会丢失)") && (accounts = accounts.filter(a => a.pubkey !== pk),
-        localStorage.setItem("dage_accounts", JSON.stringify(accounts)), localStorage.removeItem(`dage_enc_hidden_ids_${pk}`),
-        localStorage.removeItem(`dage_enc_msg_cache_${pk}`), localStorage.removeItem(`dage_enc_unread_counts_${pk}`),
-        renderAccountList());
+      if (e.stopPropagation(), !confirm("确定要从本机移除该账号吗？(本地历史消息记录也会丢失)")) return;
+      accounts = accounts.filter(a => a.pubkey !== pk), localStorage.setItem("dage_accounts", JSON.stringify(accounts));
+      ["hidden_ids", "msg_cache", "unread_counts", "last_read_watermarks", "cleared_chat_ts", "deleted_contacts", "deleted_groups", "groups_cache", "contacts_cache", "pinned_chats", "hidden_chats", "profiles_cache"].forEach(k => localStorage.removeItem(`dage_enc_${k}_${pk}`));
+      ["dage_relay", "dage_relay_block", "dage_blocklist", "lastActive", "dage_locktime", "dage_enable_sys_notify", "dage_exited_official"].forEach(k => localStorage.removeItem(`${k}_${pk}`)),
+        renderAccountList();
     }
 
     function promptLogin(pk) {
@@ -9442,17 +9459,7 @@ Disclaimer / 免责声明:
         let jsonStr = JSON.stringify(obj),
           ciphertext = await nt.nip04.encrypt(privKeyHex, pubKeyHex, jsonStr);
         localStorage.setItem(`dage_enc_${key}_${pubKeyHex}`, ciphertext);
-      } catch (e) {
-        if (("QuotaExceededError" === e.name || e.message && e.message.toLowerCase().includes("quota")) && "msg_cache" === key) {
-          let isTrimmed = !1;
-          for (let pk in obj) obj[pk] && obj[pk].length > 30 && (obj[pk] = obj[pk].slice(-30),
-            isTrimmed = !0);
-          if (isTrimmed) try {
-            let newCipher = await nt.nip04.encrypt(privKeyHex, pubKeyHex, JSON.stringify(obj));
-            localStorage.setItem(`dage_enc_${key}_${pubKeyHex}`, newCipher);
-          } catch (err) {}
-        }
-      }
+      } catch (e) {}
     }
 
     async function loadEncryptedData(key, defaultVal) {
@@ -9482,9 +9489,9 @@ Disclaimer / 免责声明:
       if (privKeyHex && pubKeyHex) try {
         await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)), await saveEncryptedData("unread_counts", unreadCounts),
           await saveEncryptedData("last_read_watermarks", lastReadWatermarks), await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps),
-          await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)), await saveEncryptedData("groups_cache", groups),
-          await saveEncryptedData("contacts_cache", contacts), await saveEncryptedData("pinned_chats", Array.from(pinnedChats)),
-          await saveEncryptedData("hidden_chats", Array.from(hiddenChats));
+          await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)), await saveEncryptedData("deleted_groups", Array.from(deletedGroups)),
+          await saveEncryptedData("groups_cache", groups), await saveEncryptedData("contacts_cache", contacts),
+          await saveEncryptedData("pinned_chats", Array.from(pinnedChats)), await saveEncryptedData("hidden_chats", Array.from(hiddenChats));
         let lightProfiles = {};
         for (let pk in profiles)
           if (lightProfiles[pk] = {
@@ -9602,7 +9609,9 @@ Disclaimer / 免责声明:
       let hArr = await loadEncryptedData("hidden_chats", []);
       hiddenChats = new Set(hArr), clearedChatTimestamps = await loadEncryptedData("cleared_chat_ts", {});
       let dContacts = await loadEncryptedData("deleted_contacts", []);
-      deletedContacts = new Set(dContacts), "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
+      deletedContacts = new Set(dContacts);
+      let dGroups = await loadEncryptedData("deleted_groups", []);
+      deletedGroups = new Set(dGroups), "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
         name: OFFICIAL_GROUP.name,
         key_hex: OFFICIAL_GROUP.key,
         type: OFFICIAL_GROUP.type,
@@ -9612,7 +9621,9 @@ Disclaimer / 免责声明:
       blocklist = savedBlocklist ? new Set(JSON.parse(savedBlocklist)) : new Set;
       let savedRelayBlock = localStorage.getItem(`dage_relay_block_${pubKeyHex}`);
       localRelayBlocklist = savedRelayBlock ? new Set(JSON.parse(savedRelayBlock)) : new Set,
-        renderContacts(), initRelayConnection();
+        renderContacts(), initRelayConnection(), setTimeout(() => {
+          isCloudSyncing = !1, syncBackupToCloud();
+        }, 5e3);
     }
 
     function initRelayConnection() {
@@ -9895,17 +9906,23 @@ Disclaimer / 免责声明:
             let decrypted = await pythonNip44Decrypt(privKeyHex, pubKeyHex, ev.content);
             if (decrypted) {
               let data = JSON.parse(decrypted);
+              if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
+                  data._dage_ext.deleted_groups && data._dage_ext.deleted_groups.forEach(gid => deletedGroups.add(gid)),
+                  data._dage_ext.hidden_msgs && data._dage_ext.hidden_msgs.forEach(mid => hiddenMsgsSet.add(mid)),
+                  data._dage_ext.cleared_ts))
+                for (let pk in data._dage_ext.cleared_ts) clearedChatTimestamps[pk] = Math.max(clearedChatTimestamps[pk] || 0, data._dage_ext.cleared_ts[pk]);
               if (data.groups && data.groups.forEach(g => {
-                  groups[g.id] || (groups[g.id] = {
+                  deletedGroups.has(g.id) || groups[g.id] || (groups[g.id] = {
                     name: g.name,
                     key_hex: g.key,
                     type: g.type || 0,
                     owner: g.owner || null
                   }, 1 === g.type ? newlyAddedGhostGids.push(g.id) : newlyAddedNormalGids.push(g.id));
                 }), data.contacts && data.contacts.forEach(c => {
-                  contacts.includes(c.pubkey) || contacts.push(c.pubkey), c.name && !profiles[c.pubkey] && (profiles[c.pubkey] = {
-                    name: c.name
-                  });
+                  deletedContacts.has(c.pubkey) || contacts.includes(c.pubkey) || contacts.push(c.pubkey),
+                    c.name && !profiles[c.pubkey] && (profiles[c.pubkey] = {
+                      name: c.name
+                    });
                 }), data.blocklist && Array.isArray(data.blocklist)) {
                 let oldSize = blocklist.size;
                 data.blocklist.forEach(pk => blocklist.add(pk)), blocklist.size !== oldSize && localStorage.setItem(`dage_blocklist_${pubKeyHex}`, JSON.stringify(Array.from(blocklist)));
@@ -10489,7 +10506,7 @@ Disclaimer / 免责声明:
     function deleteSelectedLocally() {
       0 !== selectedMsgIds.size && confirm(`确定在本地删除这 ${selectedMsgIds.size} 条消息吗？\n(这不会影响对方的显示)`) && (selectedMsgIds.forEach(id => hiddenMsgsSet.add(id)),
         messages[currentChatPk] = messages[currentChatPk].filter(m => !hiddenMsgsSet.has(m.id)),
-        syncLocalEncryptedCache(), exitSelectMode());
+        syncLocalEncryptedCache(), triggerCloudSync(), exitSelectMode());
     }
 
     function clearCurrentChatHistory() {
@@ -10498,7 +10515,8 @@ Disclaimer / 免责声明:
       if (0 === msgs.length) return alert("暂无聊天记录");
       confirm("确定要清空与该联系人的所有本地消息记录吗？\n(清空后无法恢复，且不会影响对方的记录)") && (msgs.forEach(m => hiddenMsgsSet.add(m.id)),
         messages[currentChatPk] = [], unreadCounts[currentChatPk] = 0, clearedChatTimestamps[currentChatPk] = Math.floor(Date.now() / 1e3),
-        savePrivacyStateImmediately(), syncLocalEncryptedCache(), renderMessages(!1), renderContacts());
+        savePrivacyStateImmediately(), syncLocalEncryptedCache(), triggerCloudSync(), renderMessages(!1),
+        renderContacts());
     }
 
     function renderContacts() {
@@ -11114,8 +11132,9 @@ Disclaimer / 免责声明:
 
     function exitGroupFromModal(gid) {
       confirm(`确定要退出群聊【${groups[gid].name}】吗？\n退出后将清除本地数据，重新加入需要新的邀请码。`) && (gid === OFFICIAL_GROUP.id && localStorage.setItem(`dage_exited_official_${pubKeyHex}`, "1"),
-        delete groups[gid], messages[gid] = [], delete unreadCounts[gid], syncLocalEncryptedCache(),
-        syncBackupToCloud(), renderContacts(), closePeerProfileModal(), closeChat({
+        delete groups[gid], messages[gid] = [], delete unreadCounts[gid], deletedGroups.add(gid),
+        savePrivacyStateImmediately(), syncLocalEncryptedCache(), triggerCloudSync(), renderContacts(),
+        closePeerProfileModal(), closeChat({
           stopPropagation: () => {}
         }));
     }
@@ -11128,7 +11147,7 @@ Disclaimer / 免责声明:
 
     async function addContactFromModal(pk) {
       if (contacts.includes(pk)) return;
-      contacts.push(pk), deletedContacts.delete(pk), syncLocalEncryptedCache(), await syncBackupToCloud(),
+      contacts.push(pk), deletedContacts.delete(pk), syncLocalEncryptedCache(), triggerCloudSync(),
         renderContacts(), closePeerProfileModal(), 0 === (messages[pk] || []).length ? (selectContact(pk),
           setTimeout(async () => {
             let inputEl = document.getElementById("msg-input");
@@ -11139,7 +11158,7 @@ Disclaimer / 免责声明:
     async function removeContactFromModal(pk) {
       confirm("确定要删除此好友吗？\n删除后对方将被标记为[陌生人]，但历史聊天记录会保留。") && (contacts = contacts.filter(c => c !== pk),
         deletedContacts.add(pk), savePrivacyStateImmediately(), syncLocalEncryptedCache(),
-        await syncBackupToCloud(), renderContacts(), closePeerProfileModal());
+        triggerCloudSync(), renderContacts(), closePeerProfileModal());
     }
 
     function showProfileModal() {
@@ -11468,8 +11487,7 @@ Disclaimer / 免责声明:
         blocklist.add(pk);
       } else blocklist.delete(pk);
       localStorage.setItem(`dage_blocklist_${pubKeyHex}`, JSON.stringify(Array.from(blocklist))),
-        syncBackupToCloud().catch(e => console.error("黑名单同步云端失败", e)), renderContacts(),
-        currentChatPk && renderMessages(!1), !document.getElementById("peer-profile-modal").classList.contains("hidden") && peerPkToViewGlobal && showPeerProfileModal(peerPkToViewGlobal),
+        triggerCloudSync(), renderContacts(), currentChatPk && renderMessages(!1), !document.getElementById("peer-profile-modal").classList.contains("hidden") && peerPkToViewGlobal && showPeerProfileModal(peerPkToViewGlobal),
         isBlock && alert("🚫 已屏蔽该用户，并同步至云端");
     }
 
@@ -11502,8 +11520,9 @@ Disclaimer / 免责声明:
           key_hex: keyHex,
           type: isGhost ? 1 : 0,
           owner: isGhost ? null : pubKeyHex
-        }, syncLocalEncryptedCache(), await syncBackupToCloud(), closeCreateGroupModal(),
-        await generateInviteLink(gid), renderContacts(), selectContact(gid);
+        }, deletedGroups.delete(gid), savePrivacyStateImmediately(), syncLocalEncryptedCache(),
+        triggerCloudSync(), closeCreateGroupModal(), await generateInviteLink(gid), renderContacts(),
+        selectContact(gid);
       let appendReq = ["REQ", "sub-append-new-" + gid, {
         kinds: [5, 42, 30078],
         "#g": [gid],
@@ -11570,11 +11589,12 @@ Disclaimer / 免责声明:
         } catch (e) {}
         if (groups[gid]) return alert(`您已在群组【${groupName}】中！`), void selectContact(gid);
         groups[gid] = {
-          name: groupName,
-          key_hex: keyHex,
-          type: gType,
-          owner: owner || null
-        }, syncLocalEncryptedCache(), await syncBackupToCloud(), alert(`✅ 成功加入群聊：${groupName}`);
+            name: groupName,
+            key_hex: keyHex,
+            type: gType,
+            owner: owner || null
+          }, deletedGroups.delete(gid), savePrivacyStateImmediately(), syncLocalEncryptedCache(),
+          triggerCloudSync(), alert(`✅ 成功加入群聊：${groupName}`);
         let appendReq = ["REQ", "sub-append-join-" + gid, {
           kinds: [5, 42, 30078],
           "#g": [gid],
@@ -11632,7 +11652,7 @@ Disclaimer / 免责声明:
           if (pkToAdd === pubKeyHex || contacts.includes(pkToAdd)) return alert("无效操作或已存在");
           if (!/^[0-9a-f]{64}$/i.test(pkToAdd)) return alert("❌ 公钥格式错误！必须是 npub 开头或 64 位 16 进制字符");
           contacts.push(pkToAdd), deletedContacts.delete(pkToAdd), document.getElementById("new-contact-input").value = "",
-            syncLocalEncryptedCache(), await syncBackupToCloud(), renderContacts(), 0 === (messages[pkToAdd] || []).length ? (selectContact(pkToAdd),
+            syncLocalEncryptedCache(), triggerCloudSync(), renderContacts(), 0 === (messages[pkToAdd] || []).length ? (selectContact(pkToAdd),
               setTimeout(async () => {
                 let inputEl = document.getElementById("msg-input");
                 inputEl && (inputEl.value = "👋 我已将你添加为联系人，现在我们可以开始聊天了。", await sendMessage());
@@ -11892,7 +11912,8 @@ Disclaimer / 免责声明:
 
     function clearCurrentChatHistoryForHide(pk) {
       (messages[pk] || []).forEach(m => hiddenMsgsSet.add(m.id)), messages[pk] = [], unreadCounts[pk] = 0,
-        clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3), savePrivacyStateImmediately();
+        clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3), savePrivacyStateImmediately(),
+        triggerCloudSync();
     }
 
     contactsListEl.addEventListener("touchstart", e => {
