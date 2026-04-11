@@ -7872,7 +7872,7 @@ Disclaimer / 免责声明:
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.58</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.59</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8511,10 +8511,16 @@ Disclaimer / 免责声明:
   <div id="forward-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-[80] flex items-center justify-center p-4">
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col h-[70vh]">
       <div class="flex justify-between items-center mb-3">
-        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">发送给... (合并转发)</h3>
-        <button onclick="closeForwardModal()" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 p-1"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <h3 id="forward-modal-title" class="text-lg font-bold text-gray-800 dark:text-gray-100">发送给...</h3>
+        <button onclick="closeForwardModal()" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 p-1 transition active:scale-95"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg></button>
+      </div>
+      <div class="mb-3 shrink-0">
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
+          <input type="text" id="forward-search-input" oninput="renderForwardList(this.value)" placeholder="搜索好友或群组..." class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+        </div>
       </div>
       <div id="forward-target-list" class="flex-1 overflow-y-auto no-scrollbar space-y-1"></div>
     </div>
@@ -8548,9 +8554,15 @@ Disclaimer / 免责声明:
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col h-[60vh]">
       <div class="flex justify-between items-center mb-3 shrink-0">
         <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">选择要 @ 的成员</h3>
-        <button onclick="closeMentionModal()" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 p-1"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button onclick="closeMentionModal()" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 p-1 transition active:scale-95"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
           </svg></button>
+      </div>
+      <div class="mb-3 shrink-0">
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
+          <input type="text" id="mention-search-input" oninput="renderMentionList(this.value)" placeholder="搜索成员..." class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+        </div>
       </div>
       <div id="mention-member-list" class="flex-1 overflow-y-auto no-scrollbar space-y-1"></div>
     </div>
@@ -10203,36 +10215,78 @@ Disclaimer / 免责声明:
 
     let forwardMode = "merge";
 
+    function renderForwardList(filterText = "") {
+      let listDiv = document.getElementById("forward-target-list");
+      listDiv.innerHTML = "";
+      let allChatPks = new Set([...contacts, ...Object.keys(groups), pubKeyHex]),
+        renderList = [];
+      Array.from(allChatPks).forEach(pk => {
+          let isGroup = !!groups[pk],
+            npubStr = "",
+            fallbackName = "未知";
+          try {
+            npubStr = nt.nip19.npubEncode(pk), fallbackName = npubStr.substring(0, 10) + "...";
+          } catch (e) {}
+          let prof = isGroup ? groups[pk] : profiles[pk] || {
+              name: fallbackName
+            },
+            name = prof.name || fallbackName,
+            isOfficial = pk === OFFICIAL_GROUP.id;
+          if (pk === pubKeyHex && (name = `${profiles[pubKeyHex]?.name || "我"} (备忘录 💾)`,
+              prof = profiles[pubKeyHex] || {
+                name: "我"
+              }), filterText) {
+            let text = filterText.toLowerCase(),
+              matchName = name.toLowerCase().includes(text),
+              matchPk = pk.toLowerCase().includes(text),
+              matchNpub = npubStr.toLowerCase().includes(text);
+            if (!matchName && !matchPk && !matchNpub) return;
+          }
+          renderList.push({
+            pk: pk,
+            isGroup: isGroup,
+            isOfficial: isOfficial,
+            prof: prof,
+            name: name
+          });
+        }), renderList.sort((a, b) => a.isGroup && !b.isGroup ? -1 : !a.isGroup && b.isGroup ? 1 : a.name.localeCompare(b.name, "zh")),
+        renderList.forEach(item => {
+          let {
+            pk: pk,
+            isGroup: isGroup,
+            isOfficial: isOfficial,
+            prof: prof,
+            name: name
+          } = item, avatarHtml = "";
+          if (isGroup) {
+            let icon = "🛡️",
+              bgColor = "bg-green-500";
+            1 === prof.type ? (name = `[共享群] ${name}`, icon = "⚡", bgColor = "bg-purple-500") : isOfficial ? (name = `[测试频道] ${name}`,
+              icon = "📢") : name = `[加密群] ${name}`, avatarHtml = `<div class="w-10 h-10 rounded-full ${bgColor} text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${icon}</div>`;
+          } else {
+            let picUrl = formatAvatarUrl(prof.picture);
+            if (picUrl) avatarHtml = `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm">`;
+            else {
+              avatarHtml = `<div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">${escapeHTML(name ? name.substring(0, 1) : "?")}</div>`;
+            }
+          }
+          let btn = document.createElement("button");
+          btn.className = "w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50 dark:border-gray-800 dark:hover:bg-gray-800",
+            btn.innerHTML = `${avatarHtml}<span class="text-sm font-medium text-gray-800 dark:text-gray-100 ml-3 truncate">${escapeHTML(name)}</span>`,
+            btn.onclick = () => {
+              confirm(`确定要${"merge" === forwardMode ? "合并转发" : "step" === forwardMode ? "逐条转发" : "转发"}到 ${name} 吗？`) && ("merge" === forwardMode ? confirmMergeForward(pk) : confirmStepForward(pk));
+            }, listDiv.appendChild(btn);
+        }), 0 === renderList.length && (listDiv.innerHTML = '<div class="text-center text-xs text-gray-400 mt-10">未找到联系人或群组</div>');
+    }
+
     function openForwardModal(mode) {
       if (0 === selectedMsgIds.size) return alert("请至少选择一条消息");
       forwardMode = mode;
-      let listDiv = document.getElementById("forward-target-list");
-      listDiv.innerHTML = "";
-      let allChatPks = new Set([...contacts, ...Object.keys(messages), ...Object.keys(groups)]);
-      Array.from(allChatPks).forEach(pk => {
-        let isGroup = !!groups[pk];
-        if (pk === pubKeyHex) return;
-        let fallbackName = "未知";
-        try {
-          fallbackName = nt.nip19.npubEncode(pk).substring(0, 10) + "...";
-        } catch (e) {}
-        let prof = isGroup ? groups[pk] : profiles[pk] || {
-            name: fallbackName
-          },
-          isOfficial = pk === OFFICIAL_GROUP.id,
-          name = prof.name,
-          icon = "👤",
-          bgColor = "bg-blue-500";
-        isGroup && (bgColor = "bg-green-500", 1 === prof.type ? (name = `[共享群] ${prof.name}`,
-          icon = "⚡", bgColor = "bg-purple-500") : isOfficial ? (name = `[测试频道] ${prof.name}`,
-          icon = "📢") : (name = `[加密群] ${prof.name}`, icon = "🛡️"));
-        let btn = document.createElement("button");
-        btn.className = "w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50",
-          btn.innerHTML = `<div class="w-10 h-10 rounded-full ${bgColor} text-white flex items-center justify-center font-bold mr-3">${icon}</div>\n                                                 <span class="text-sm font-medium text-gray-800 dark:text-gray-100">${escapeHTML(name)}</span>`,
-          btn.onclick = () => {
-            confirm(`确定要${"merge" === forwardMode ? "合并转发" : "step" === forwardMode ? "逐条转发" : "转发"}到 ${name} 吗？`) && ("merge" === forwardMode ? confirmMergeForward(pk) : confirmStepForward(pk));
-          }, listDiv.appendChild(btn);
-      }), document.getElementById("forward-modal").classList.remove("hidden"), ModalManager.push("forward", closeForwardModal);
+      let titleEl = document.getElementById("forward-modal-title");
+      titleEl && (titleEl.innerText = "merge" === mode ? "发送给... (合并转发)" : "发送给... (逐条转发)");
+      let searchInput = document.getElementById("forward-search-input");
+      searchInput && (searchInput.value = ""), renderForwardList(), document.getElementById("forward-modal").classList.remove("hidden"),
+        ModalManager.push("forward", closeForwardModal);
     }
 
     function closeForwardModal(fromPopState = !1) {
@@ -11435,16 +11489,59 @@ Disclaimer / 免责声明:
         alert(`✅ 已成功导出 ${totalExportedMsgs} 条记录到 ${fmt.toUpperCase()} 文件！`);
     }
 
-    function openMentionModal() {
+    function renderMentionList(filterText = "") {
       if (!currentChatPk || !groups[currentChatPk]) return;
       let listDiv = document.getElementById("mention-member-list");
-      listDiv.innerHTML = "", groups[currentChatPk].owner === pubKeyHex && (listDiv.innerHTML += '\n                    <button onclick="insertMention(\'所有人\', \'ALL\')" class="w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50">\n                        <div class="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center font-bold mr-3">📢</div>\n                        <span class="text-sm font-bold text-red-500">所有人 (全员提醒)</span>\n                    </button>\n                ');
+      listDiv.innerHTML = "";
+      let isGhost = 1 === groups[currentChatPk].type,
+        isOwner = groups[currentChatPk].owner === pubKeyHex;
+      !isOwner || filterText && !"所有人全员提醒".includes(filterText) || (listDiv.innerHTML += '\n                    <button onclick="insertMention(\'所有人\', \'ALL\')" class="w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50 dark:border-gray-800 dark:hover:bg-gray-800">\n                        <div class="w-10 h-10 rounded-full bg-red-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">📢</div>\n                        <span class="text-sm font-bold text-red-500 ml-3">所有人 (全员提醒)</span>\n                    </button>\n                ');
       let msgs = messages[currentChatPk] || [],
         memberPks = new Set(msgs.map(m => m.sender));
-      memberPks.delete(pubKeyHex), memberPks.forEach(pk => {
+      memberPks.delete(pubKeyHex);
+      let renderList = [];
+      memberPks.forEach(pk => {
+        let npubStr = "";
+        try {
+          npubStr = nt.nip19.npubEncode(pk);
+        } catch (e) {}
         let name = profiles[pk]?.name || `User ${pk.substring(0, 6)}`;
-        1 === groups[currentChatPk].type && (name = "Anon"), listDiv.innerHTML += `\n                    <button onclick="insertMention('${escapeHTML(name)}', '${pk}')" class="w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50">\n                        <div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold mr-3">👤</div>\n                        <span class="text-sm font-medium text-gray-800 dark:text-gray-100">${escapeHTML(name)}</span>\n                    </button>\n                `;
-      }), document.getElementById("mention-modal").classList.remove("hidden"), ModalManager.push("mention", closeMentionModal);
+        if (isGhost && (name = "Anon"), filterText) {
+          let text = filterText.toLowerCase(),
+            matchName = name.toLowerCase().includes(text),
+            matchPk = pk.toLowerCase().includes(text),
+            matchNpub = npubStr.toLowerCase().includes(text);
+          if (!matchName && !matchPk && !matchNpub) return;
+        }
+        renderList.push({
+          pk: pk,
+          name: name
+        });
+      }), renderList.forEach(item => {
+        let {
+          pk: pk,
+          name: name
+        } = item, avatarHtml = "";
+        if (isGhost) avatarHtml = '<div class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-sm">🎭</div>';
+        else {
+          let picUrl = formatAvatarUrl(profiles[pk]?.picture);
+          if (picUrl) avatarHtml = `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm">`;
+          else {
+            avatarHtml = `<div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${escapeHTML(name ? name.substring(0, 1) : "?")}</div>`;
+          }
+        }
+        let btn = document.createElement("button");
+        btn.className = "w-full flex items-center p-3 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition border-b border-gray-50 dark:border-gray-800 dark:hover:bg-gray-800",
+          btn.innerHTML = `${avatarHtml}<span class="text-sm font-medium text-gray-800 dark:text-gray-100 ml-3 truncate">${escapeHTML(name)}</span>`,
+          btn.onclick = () => insertMention(escapeHTML(name), pk), listDiv.appendChild(btn);
+      }), 0 !== renderList.length || isOwner && !filterText || (listDiv.innerHTML = '<div class="text-center text-xs text-gray-400 mt-10">未找到相关成员</div>');
+    }
+
+    function openMentionModal() {
+      if (!currentChatPk || !groups[currentChatPk]) return;
+      let searchInput = document.getElementById("mention-search-input");
+      searchInput && (searchInput.value = ""), renderMentionList(), document.getElementById("mention-modal").classList.remove("hidden"),
+        ModalManager.push("mention", closeMentionModal);
     }
 
     function closeMentionModal(fromPopState = !1) {
