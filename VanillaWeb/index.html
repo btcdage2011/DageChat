@@ -7872,7 +7872,7 @@ Disclaimer / 免责声明:
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.59</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.60</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8225,7 +8225,7 @@ Disclaimer / 免责声明:
   <div id="profile-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40 p-4 flex items-center justify-center">
     <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
       <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-800 shrink-0 rounded-t-2xl">
-        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">个人资料与设置</h3>
+        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100">系统设置</h3>
         <button onclick="closeProfileModal()" class="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-100 p-1 transition active:scale-95">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -8233,118 +8233,128 @@ Disclaimer / 免责声明:
         </button>
       </div>
 
-      <div class="p-5 flex-1 overflow-y-auto no-scrollbar space-y-4">
 
-        <div class="space-y-2">
-          <div class="flex space-x-2">
-            <button onclick="openRelayManager()" class="flex-1 bg-gray-100 dark:bg-gray-950 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition border border-gray-200 dark:border-gray-700 flex items-center justify-center active:scale-95">
-              多节点与网络
-            </button>
-            <button onclick="forceIncrementalUploadToCloud(this)" class="flex-1 bg-indigo-50 text-indigo-600 py-2 rounded-lg text-xs font-medium hover:bg-indigo-100 transition border border-indigo-200 flex items-center justify-center active:scale-95">
-              增量云端备份
-            </button>
-            <button onclick="openBlocklistManager()" class="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-xs font-medium hover:bg-red-100 transition border border-red-100 flex items-center justify-center active:scale-95">
-              🚫 黑名单
-            </button>
+      <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shrink-0 pt-1 px-2">
+        <button id="tab-btn-profile" onclick="switchProfileTab('profile')" class="flex-1 py-2.5 text-sm font-bold border-b-2 border-blue-500 text-blue-600 transition">👤 个人资料</button>
+        <button id="tab-btn-privacy" onclick="switchProfileTab('privacy')" class="flex-1 py-2.5 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition">🛡️ 隐私与系统</button>
+      </div>
+
+      <div class="p-5 flex-1 overflow-y-auto no-scrollbar relative">
+
+
+        <div id="profile-tab-content" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">我的公钥 (发给朋友添加你)</label>
+            <div class="flex">
+              <input type="text" id="my-npub-display" readonly class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-gray-100 dark:bg-gray-950 text-gray-500 dark:text-gray-400 font-mono text-xs overflow-hidden outline-none">
+              <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 text-sm border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
+              <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value, document.getElementById('edit-name').value || '我')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg text-lg border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">📱</button>
+            </div>
           </div>
 
-          <button onclick="openExportModal()" class="w-full bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 dark:bg-gray-800 transition border border-gray-300 dark:border-gray-600 shadow-sm flex items-center justify-center active:scale-95">
-            <svg class="w-4 h-4 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-              <polyline points="16 17 22 17 22 11"></polyline>
-              <path d="M22 17L12 7"></path>
-            </svg>
-            全局导出聊天记录 (HTML / TXT)
-          </button>
-          <button id="theme-toggle-btn" onclick="toggleTheme()" class="w-full bg-gray-100 dark:bg-gray-950 dark:bg-gray-800 text-gray-700 dark:text-gray-200 dark:text-gray-300 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition border border-gray-300 dark:border-gray-600 dark:border-gray-600 shadow-sm flex items-center justify-center active:scale-95 mt-2">
-            🌙 切换暗色
-          </button>
-          <button onclick="openChangePwdModal()" class="w-full bg-white dark:bg-gray-900 text-red-500 py-2 rounded-lg text-xs font-bold hover:bg-red-50 dark:hover:bg-gray-800 transition border border-red-200 dark:border-red-800 shadow-sm flex items-center justify-center active:scale-95 mt-2">
-            🔑 修改本地登录密码
-          </button>
-
-
-        </div>
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">我的公钥 (发给朋友添加你)</label>
-          <div class="flex">
-            <input type="text" id="my-npub-display" readonly class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-gray-100 dark:bg-gray-950 text-gray-500 dark:text-gray-400 font-mono text-xs overflow-hidden outline-none">
-            <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 text-sm border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
-            <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value, document.getElementById('edit-name').value || '我')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg text-lg border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">📱</button>
-          </div>
-        </div>
-        <div class="flex space-x-3">
-          <div class="flex-1">
+          <div>
             <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">展示昵称 (Name)</label>
             <input type="text" id="edit-name" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
           </div>
-          <div class="w-24 shrink-0">
-            <label class="block text-[10px] font-medium text-gray-500 dark:text-gray-400 mb-1 leading-tight">锁屏时间<br>(1~600分)</label>
-            <input type="number" id="edit-locktime" min="1" max="600" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center">
-          </div>
-        </div>
 
-        <div class="flex space-x-3">
-          <div class="flex-1">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">闪电网络 (LN/lud16)</label>
-            <input type="text" id="edit-ln" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="user@getalby.com">
-          </div>
-          <div class="flex-1">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">网站 (Website)</label>
-            <input type="text" id="edit-website" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://...">
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-4">
-
-          <div class="relative shrink-0 cursor-pointer group" onclick="document.getElementById('avatar-upload').click()" title="点击上传本地头像">
-            <div id="profile-avatar-preview" class="w-14 h-14 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex items-center justify-center border border-gray-300 dark:border-gray-600 shadow-sm text-gray-400 text-xs">
-              无
+          <div class="flex space-x-3">
+            <div class="flex-1">
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">闪电网络 (LN/lud16)</label>
+              <input type="text" id="edit-ln" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="user@getalby.com">
             </div>
-            <div class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <div class="flex-1">
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">网站 (Website)</label>
+              <input type="text" id="edit-website" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://...">
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-4">
+            <div class="relative shrink-0 cursor-pointer group" onclick="document.getElementById('avatar-upload').click()" title="点击上传本地头像">
+              <div id="profile-avatar-preview" class="w-14 h-14 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex items-center justify-center border border-gray-300 dark:border-gray-600 shadow-sm text-gray-400 text-xs">无</div>
+              <div class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                </svg>
+              </div>
+              <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+            </div>
+            <div class="flex-1 min-w-0">
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">头像数据 (支持本地传图自动生成)</label>
+              <input type="text" id="edit-avatar" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https:// 或 Base64" oninput="updateProfileAvatarPreview()">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">个人简介 (About)</label>
+            <textarea id="edit-about" rows="2" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="写点什么..."></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">公开展示的 Relay 列表</label>
+            <textarea id="edit-relays-display" rows="2" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="wss://relay.damus.io, wss://..."></textarea>
+          </div>
+        </div>
+
+
+        <div id="privacy-tab-content" class="space-y-4 hidden">
+
+
+          <div class="space-y-3 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+            <label class="flex items-start cursor-pointer">
+              <input type="checkbox" id="edit-enable-notify" class="mt-0.5 dark:bg-gray-800 dark:border-gray-600 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+              <span class="ml-2 text-xs font-medium text-gray-700 dark:text-gray-200">启用后台系统通知 (防打扰模式)</span>
+            </label>
+            <label class="flex items-start cursor-pointer">
+              <input type="checkbox" id="edit-reject-stranger" class="mt-0.5 dark:bg-gray-800 dark:border-gray-600 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+              <span class="ml-2 text-xs font-medium text-gray-700 dark:text-gray-200">🚫 拒收陌生人消息 (直接丢弃未添加好友的消息)</span>
+            </label>
+            <label class="flex items-start cursor-pointer">
+              <input type="checkbox" id="edit-reject-nip04" class="mt-0.5 dark:bg-gray-800 dark:border-gray-600 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+              <span class="ml-2 text-xs font-medium text-gray-700 dark:text-gray-200">🔒 强制高隐私模式 (拒收明文的 NIP-04 私聊消息)</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+            <label class="text-xs font-medium text-gray-700 dark:text-gray-200">防窥锁屏时间 (分钟)</label>
+            <input type="number" id="edit-locktime" min="1" max="600" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-20 border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-red-600 mb-1">私钥备份 (须验证密码)</label>
+            <div class="flex">
+              <input type="password" id="my-nsec-display" readonly value="••••••••••••••" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-red-50 text-red-600 font-mono text-xs overflow-hidden outline-none">
+              <button onclick="actionWithPasswordVerification('toggleKey')" id="btn-toggle-key" class="bg-gray-100 dark:bg-gray-950 hover:bg-gray-200 text-gray-700 dark:text-gray-200 px-3 text-sm border-t border-b border-gray-300 dark:border-gray-600 transition font-medium">显示</button>
+              <button onclick="actionWithPasswordVerification('copyKey')" class="bg-red-500 hover:bg-red-600 text-white px-3 text-sm border border-l-0 border-red-500 transition font-medium whitespace-nowrap">复制</button>
+              <button onclick="actionWithPasswordVerification('showQrKey')" class="bg-red-600 hover:bg-red-700 text-white px-3 rounded-r-lg text-lg border border-l-0 border-red-500 transition font-medium whitespace-nowrap">📱</button>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2">
+            <div class="flex space-x-2">
+              <button onclick="openRelayManager()" class="flex-1 bg-gray-100 dark:bg-gray-950 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition border border-gray-200 dark:border-gray-700 flex items-center justify-center active:scale-95">多节点与网络</button>
+              <button onclick="forceIncrementalUploadToCloud(this)" class="flex-1 bg-indigo-50 text-indigo-600 py-2 rounded-lg text-xs font-medium hover:bg-indigo-100 transition border border-indigo-200 flex items-center justify-center active:scale-95">增量云端备份</button>
+              <button onclick="openBlocklistManager()" class="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-xs font-medium hover:bg-red-100 transition border border-red-100 flex items-center justify-center active:scale-95">🚫 黑名单</button>
+            </div>
+            <button onclick="openExportModal()" class="w-full bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 dark:bg-gray-800 transition border border-gray-300 dark:border-gray-600 shadow-sm flex items-center justify-center active:scale-95">
+              <svg class="w-4 h-4 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                <polyline points="16 17 22 17 22 11"></polyline>
+                <path d="M22 17L12 7"></path>
               </svg>
-            </div>
-
-            <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
-          </div>
-          <div class="flex-1 min-w-0">
-            <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">头像数据 (支持本地传图自动生成)</label>
-            <input type="text" id="edit-avatar" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https:// 或 Base64" oninput="updateProfileAvatarPreview()">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">个人简介 (About)</label>
-          <textarea id="edit-about" rows="2" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="写点什么..."></textarea>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">公开展示的 Relay 列表 (供他人查阅)</label>
-          <textarea id="edit-relays-display" rows="2" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="wss://relay.damus.io, wss://..."></textarea>
-        </div>
-
-        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-3">
-          <label class="flex items-center cursor-pointer">
-            <input type="checkbox" id="edit-enable-notify" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500">
-            <span class="ml-2 text-xs font-medium text-gray-700 dark:text-gray-200">启用后台系统通知 (仅私聊 / 群聊被@时提醒，不显示内容)</span>
-          </label>
-        </div>
-
-        <div class="mt-2">
-          <label class="block text-xs font-bold text-red-600 mb-1">私钥备份 (须验证密码)</label>
-          <div class="flex">
-            <input type="password" id="my-nsec-display" readonly value="••••••••••••••" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-red-50 text-red-600 font-mono text-xs overflow-hidden outline-none">
-            <button onclick="actionWithPasswordVerification('toggleKey')" id="btn-toggle-key" class="bg-gray-100 dark:bg-gray-950 hover:bg-gray-200 text-gray-700 dark:text-gray-200 px-3 text-sm border-t border-b border-gray-300 dark:border-gray-600 transition font-medium">显示</button>
-            <button onclick="actionWithPasswordVerification('copyKey')" class="bg-red-500 hover:bg-red-600 text-white px-3 text-sm border border-l-0 border-red-500 transition font-medium whitespace-nowrap">复制</button>
-            <button onclick="actionWithPasswordVerification('showQrKey')" class="bg-red-600 hover:bg-red-700 text-white px-3 rounded-r-lg text-lg border border-l-0 border-red-500 transition font-medium whitespace-nowrap">📱</button>
+              全局导出聊天记录 (HTML / TXT)
+            </button>
+            <button id="theme-toggle-btn" onclick="toggleTheme()" class="w-full bg-gray-100 dark:bg-gray-950 text-gray-700 dark:text-gray-200 py-2 rounded-lg text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition border border-gray-300 dark:border-gray-600 shadow-sm flex items-center justify-center active:scale-95">
+              🌙 切换暗色
+            </button>
+            <button onclick="openChangePwdModal()" class="w-full bg-white dark:bg-gray-900 text-red-500 py-2 rounded-lg text-xs font-bold hover:bg-red-50 dark:hover:bg-gray-800 transition border border-red-200 dark:border-red-800 shadow-sm flex items-center justify-center active:scale-95">
+              🔑 修改本地登录密码
+            </button>
           </div>
         </div>
       </div>
+
       <div class="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 rounded-b-2xl flex justify-end shrink-0">
-        <button onclick="saveProfile()" class="w-full py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95">保存设置</button>
+        <button onclick="saveProfile()" class="w-full py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95">保存所有设置</button>
       </div>
     </div>
   </div>
@@ -9980,6 +9990,7 @@ Disclaimer / 免责声明:
           }), void(isChanged && (syncLocalEncryptedCache(), triggerBatchUpdate(!1)));
         }
         if (4 === ev.kind) {
+          if ("1" === localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
           if (hiddenMsgsSet.has(ev.id)) return;
           try {
             let peerPk = ev.pubkey === pubKeyHex ? ev.tags.find(t => "p" === t[0])[1] : ev.pubkey;
@@ -10036,10 +10047,13 @@ Disclaimer / 免责声明:
     }
 
     function _processDecryptedMessage(peerPk, msgId, senderPk, decryptedText, timestamp, encType, replyId = null) {
-      if (!(clearedChatTimestamps[peerPk] && timestamp <= clearedChatTimestamps[peerPk] || (messages[peerPk] || (messages[peerPk] = []),
-          messages[peerPk].find(function(m) {
-            return m.id === msgId;
-          })))) {
+      if (clearedChatTimestamps[peerPk] && timestamp <= clearedChatTimestamps[peerPk]) return;
+      if (!!!groups[peerPk] && !(senderPk === pubKeyHex) && !contacts.includes(senderPk)) {
+        if ("1" === localStorage.getItem("dage_reject_stranger_" + pubKeyHex)) return;
+      }
+      if (messages[peerPk] || (messages[peerPk] = []), !messages[peerPk].find(function(m) {
+          return m.id === msgId;
+        })) {
         let isNewRealTimeMsg = !0;
         timestamp <= (lastReadWatermarks[peerPk] || 0) && (isNewRealTimeMsg = !1);
         let isAtMe = !1,
@@ -11225,9 +11239,14 @@ Disclaimer / 免责声明:
         document.getElementById("edit-locktime").value = lockTimeMins;
       let notifySetting = localStorage.getItem("dage_enable_sys_notify_" + pubKeyHex);
       document.getElementById("edit-enable-notify").checked = "0" !== notifySetting;
+      let rejectStranger = localStorage.getItem("dage_reject_stranger_" + pubKeyHex);
+      document.getElementById("edit-reject-stranger").checked = "1" === rejectStranger;
+      let rejectNip04 = localStorage.getItem("dage_reject_nip04_" + pubKeyHex);
+      document.getElementById("edit-reject-nip04").checked = "1" === rejectNip04;
       let skInput = document.getElementById("my-nsec-display");
       skInput.value = "••••••••••••••", skInput.type = "password", document.getElementById("btn-toggle-key").innerText = "显示",
-        updateProfileAvatarPreview(), ModalManager.push("profile", closeProfileModal);
+        updateProfileAvatarPreview(), "function" == typeof switchProfileTab && switchProfileTab("profile"),
+        ModalManager.push("profile", closeProfileModal);
     }
 
     function closeProfileModal(fromPopState = !1) {
@@ -11237,6 +11256,18 @@ Disclaimer / 免责声明:
         fromPopState || ModalManager.pop("profile");
     }
 
+    function switchProfileTab(tab) {
+      let btnProfile = document.getElementById("tab-btn-profile"),
+        btnPrivacy = document.getElementById("tab-btn-privacy"),
+        contentProfile = document.getElementById("profile-tab-content"),
+        contentPrivacy = document.getElementById("privacy-tab-content");
+      "profile" === tab ? (btnProfile.className = "flex-1 py-2.5 text-sm font-bold border-b-2 border-blue-500 text-blue-600 transition",
+        btnPrivacy.className = "flex-1 py-2.5 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition",
+        contentProfile.classList.remove("hidden"), contentPrivacy.classList.add("hidden")) : (btnPrivacy.className = "flex-1 py-2.5 text-sm font-bold border-b-2 border-blue-500 text-blue-600 transition",
+        btnProfile.className = "flex-1 py-2.5 text-sm font-bold border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition",
+        contentPrivacy.classList.remove("hidden"), contentProfile.classList.add("hidden"));
+    }
+
     async function saveProfile() {
       let timeVal = parseInt(document.getElementById("edit-locktime").value);
       (isNaN(timeVal) || timeVal < 1) && (timeVal = 1), timeVal > 600 && (timeVal = 600),
@@ -11244,6 +11275,10 @@ Disclaimer / 免责声明:
       let isNotifyEnabled = document.getElementById("edit-enable-notify").checked;
       localStorage.setItem("dage_enable_sys_notify_" + pubKeyHex, isNotifyEnabled ? "1" : "0"),
         isNotifyEnabled && requestNotificationPermission();
+      let isRejectStranger = document.getElementById("edit-reject-stranger").checked;
+      localStorage.setItem("dage_reject_stranger_" + pubKeyHex, isRejectStranger ? "1" : "0");
+      let isRejectNip04 = document.getElementById("edit-reject-nip04").checked;
+      localStorage.setItem("dage_reject_nip04_" + pubKeyHex, isRejectNip04 ? "1" : "0");
       let name = document.getElementById("edit-name").value.trim(),
         pic = document.getElementById("edit-avatar").value.trim(),
         about = document.getElementById("edit-about").value.trim(),
