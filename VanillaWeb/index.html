@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.63</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.65</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8820,7 +8820,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if (privKeyHex && pubKeyHex) try {
         await saveEncryptedData("unread_counts", unreadCounts), await saveEncryptedData("last_read_watermarks", lastReadWatermarks),
           await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps), await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)),
-          await saveEncryptedData("deleted_groups", Array.from(deletedGroups)), await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet));
+          await saveEncryptedData("deleted_groups", Array.from(deletedGroups)), await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)),
+          await saveEncryptedData("ghost_nonces", Array.from(myGhostNonces));
       } catch (e) {}
     }
 
@@ -8931,12 +8932,28 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     };
 
     function broadcastToRelays(msgStr) {
-      let sentCount = 0;
-      for (let url in wsPool) {
-        let ws = wsPool[url];
-        ws && ws.readyState === WebSocket.OPEN && (ws.send(msgStr), sentCount++);
-      }
-      0 === sentCount && console.warn("⚠️ [网络] 没有可用的 Relay 节点，消息可能发送失败！");
+      return new Promise(resolve => {
+        let sentCount = 0,
+          eventId = null;
+        try {
+          let parsed = JSON.parse(msgStr);
+          "EVENT" === parsed[0] && parsed[1] && parsed[1].id && (eventId = parsed[1].id);
+        } catch (e) {}
+        for (let url in wsPool) {
+          let ws = wsPool[url];
+          ws && ws.readyState === WebSocket.OPEN && (ws.send(msgStr), sentCount++);
+        }
+        if (0 === sentCount) return console.warn("⚠️ [网络] 没有可用的 Relay 节点，消息可能发送失败！"), resolve(!1);
+        if (!eventId) return resolve(!0);
+        let isResolved = !1,
+          timeoutTimer = setTimeout(() => {
+            isResolved || (isResolved = !0, resolve(!1));
+          }, 1e4);
+        window._ackListeners || (window._ackListeners = {}), window._ackListeners[eventId] = success => {
+          isResolved || (isResolved = !0, clearTimeout(timeoutTimer), delete window._ackListeners[eventId],
+            resolve(success));
+        };
+      });
     }
 
     function getReplyId(tags) {
@@ -9026,7 +9043,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function formatAvatarUrl(pic) {
-      return pic ? pic.startsWith("http") || pic.startsWith("data:image") ? pic : "data:image/jpeg;base64," + pic : "";
+      if (!pic) return "";
+      let cleanPic = pic.trim().replace(/["'<>\s\\]/g, "");
+      return cleanPic.toLowerCase().startsWith("javascript:") ? "" : cleanPic.startsWith("http") || cleanPic.startsWith("data:image") ? cleanPic : "data:image/jpeg;base64," + cleanPic;
     }
 
     let imgScale = 1,
@@ -9149,20 +9168,20 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       };
       if (rawContent && "string" == typeof rawContent && rawContent.trim().startsWith("{")) try {
         let j = JSON.parse(rawContent);
-        if ("history" === j.type) return parsed.isHistory = !0, parsed.historyData = j,
-          parsed.text = "", parsed;
+        if ("history" === j.type) return parsed.isHistory = !0, Array.isArray(j.items) || (j.items = []),
+          parsed.historyData = j, parsed.text = "", parsed;
         if (void 0 !== j.text) {
           let innerText = j.text;
           if ("string" == typeof innerText && innerText.trim().startsWith("{")) try {
             let innerJ = JSON.parse(innerText);
-            if ("history" === innerJ.type) return parsed.isHistory = !0, parsed.historyData = innerJ,
-              parsed.text = "", j.alias && (parsed.alias = j.alias), j.nonce && (parsed.nonce = j.nonce),
-              j.name && (parsed.name = j.name), parsed;
+            if ("history" === innerJ.type) return parsed.isHistory = !0, Array.isArray(innerJ.items) || (innerJ.items = []),
+              parsed.historyData = innerJ, parsed.text = "", j.alias && (parsed.alias = j.alias),
+              j.nonce && (parsed.nonce = j.nonce), j.name && (parsed.name = j.name), parsed;
           } catch (e) {}
-          parsed.text = innerText;
+          parsed.text = String(innerText);
         }
-        j.image && (parsed.imageB64 = j.image), j.alias && (parsed.alias = j.alias), j.nonce && (parsed.nonce = j.nonce),
-          j.name && (parsed.name = j.name);
+        j.image && (parsed.imageB64 = String(j.image).replace(/[^a-zA-Z0-9+/=]/g, "")),
+          j.alias && (parsed.alias = j.alias), j.nonce && (parsed.nonce = j.nonce), j.name && (parsed.name = j.name);
       } catch (e) {
         console.error("Parse Message Content Error:", e);
       }
@@ -9185,6 +9204,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           pubkey: pk,
           name: profiles[pk] && profiles[pk].name ? profiles[pk].name : ""
         })),
+        hiddenArray = Array.from(hiddenMsgsSet),
         payload = JSON.stringify({
           groups: groupsList,
           contacts: contactsList,
@@ -9195,7 +9215,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             deleted_contacts: Array.from(deletedContacts),
             deleted_groups: Array.from(deletedGroups),
             cleared_ts: clearedChatTimestamps,
-            hidden_msgs: Array.from(hiddenMsgsSet).slice(-2e3)
+            hidden_msgs: hiddenArray.length > 300 ? hiddenArray.slice(-300) : hiddenArray
           }
         }),
         cipher = await pythonNip44Encrypt(privKeyHex, pubKeyHex, payload),
@@ -9206,7 +9226,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function linkifyAndRenderMedia(txt, isMe) {
-      return escapeHTML(txt).replace(/(https?:\/\/[^\s]+)/g, url => url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) ? `<a href="${url}" target="_blank" class="block mt-2 mb-1"><img src="${url}" class="max-w-full max-h-48 rounded-lg object-contain border border-gray-100 dark:border-gray-800 shadow-sm"></a>` : `<a href="${url}" target="_blank" class="${isMe ? "text-blue-200 hover:text-white" : "text-blue-500 hover:text-blue-700"} underline break-all">${url}</a>`);
+      return escapeHTML(txt).replace(/(https?:\/\/[^\s]+)/g, url => url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) ? `<div class="mt-2 mb-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 text-center cursor-pointer shadow-sm" data-safe-url="${url}" onclick="let img = document.createElement('img'); img.src = this.getAttribute('data-safe-url'); img.className = 'max-w-full max-h-48 rounded-lg object-contain'; this.innerHTML = ''; this.appendChild(img); this.onclick = null;">\n                        <span class="text-blue-500 text-xs font-bold">🖼️ 点击加载外部图片 (注意: 加载将向对方服务器暴露您的 IP)</span>\n                    </div>` : `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${isMe ? "text-blue-200 hover:text-white" : "text-blue-500 hover:text-blue-700"} underline break-all">${url}</a>`);
     }
 
     function bytesToBase64(bytes) {
@@ -9391,35 +9411,67 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         setTimeout(() => document.getElementById("lock-pwd").focus(), 100);
     }
 
-    async function getAesKey(password) {
+    async function getLegacyAesKey(password) {
       const hash = await crypto.subtle.digest("SHA-256", (new TextEncoder).encode(password));
       return crypto.subtle.importKey("raw", hash, {
         name: "AES-GCM"
       }, !1, ["encrypt", "decrypt"]);
     }
 
+    async function getV2AesKey(password, saltHex) {
+      const enc = (new TextEncoder).encode(password),
+        keyMaterial = await crypto.subtle.importKey("raw", enc, {
+          name: "PBKDF2"
+        }, !1, ["deriveKey"]),
+        salt = new Uint8Array(saltHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+      return crypto.subtle.deriveKey({
+        name: "PBKDF2",
+        salt: salt,
+        iterations: 1e5,
+        hash: "SHA-256"
+      }, keyMaterial, {
+        name: "AES-GCM",
+        length: 256
+      }, !1, ["encrypt", "decrypt"]);
+    }
+
     async function aesEncrypt(text, password) {
-      const key = await getAesKey(password),
+      const salt = crypto.getRandomValues(new Uint8Array(16)),
+        saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, "0")).join(""),
+        key = await getV2AesKey(password, saltHex),
         iv = crypto.getRandomValues(new Uint8Array(12)),
         enc = (new TextEncoder).encode(text),
         cipher = await crypto.subtle.encrypt({
           name: "AES-GCM",
           iv: iv
         }, key, enc),
-        combined = new Uint8Array(iv.length + cipher.byteLength);
-      return combined.set(iv, 0), combined.set(new Uint8Array(cipher), iv.length), Array.from(combined).map(b => b.toString(16).padStart(2, "0")).join("");
+        combined = new Uint8Array(29 + cipher.byteLength);
+      return combined[0] = 2, combined.set(salt, 1), combined.set(iv, 17), combined.set(new Uint8Array(cipher), 29),
+        Array.from(combined).map(b => b.toString(16).padStart(2, "0")).join("");
     }
 
     async function aesDecrypt(hexStr, password) {
-      const key = await getAesKey(password),
-        bytes = new Uint8Array(hexStr.match(/.{1,2}/g).map(byte => parseInt(byte, 16))),
-        iv = bytes.slice(0, 12),
-        cipher = bytes.slice(12),
-        dec = await crypto.subtle.decrypt({
-          name: "AES-GCM",
-          iv: iv
-        }, key, cipher);
-      return (new TextDecoder).decode(dec);
+      const bytes = new Uint8Array(hexStr.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+      if (2 === bytes[0] && bytes.length > 29) {
+        const saltHex = Array.from(bytes.slice(1, 17)).map(b => b.toString(16).padStart(2, "0")).join(""),
+          iv = bytes.slice(17, 29),
+          cipher = bytes.slice(29),
+          key = await getV2AesKey(password, saltHex),
+          dec = await crypto.subtle.decrypt({
+            name: "AES-GCM",
+            iv: iv
+          }, key, cipher);
+        return (new TextDecoder).decode(dec);
+      } {
+        const key = await getLegacyAesKey(password),
+          iv = bytes.slice(0, 12),
+          cipher = bytes.slice(12),
+          dec = await crypto.subtle.decrypt({
+            name: "AES-GCM",
+            iv: iv
+          }, key, cipher);
+        return (new TextDecoder).decode(dec);
+      }
     }
 
     function showAddAccountArea() {
@@ -9440,10 +9492,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let div = document.createElement("div");
         div.className = "flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:bg-gray-800 cursor-pointer transition shadow-sm bg-white dark:bg-gray-900";
         let picUrl = formatAvatarUrl(acc.picture),
-          avatar = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">${acc.name ? acc.name.charAt(0) : "我"}</div>`,
-          nameStr = acc.name || "未命名账号",
+          safeFallbackChar = escapeHTML(acc.name ? String(acc.name).substring(0, 1) : "我"),
+          safeNameStr = escapeHTML(acc.name || "未命名账号"),
+          avatar = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">${safeFallbackChar}</div>`,
           npubStr = acc.npub.substring(0, 10) + "...";
-        div.innerHTML = `\n                            <div class="flex items-center space-x-3 flex-1 min-w-0" onclick="promptLogin('${acc.pubkey}')">\n                                ${avatar}\n                                <div class="flex-1 min-w-0 pr-2">\n                                    <div class="font-bold text-gray-800 dark:text-gray-100 text-sm truncate">${nameStr}</div>\n                                    <div class="text-[11px] text-gray-400 font-mono truncate">${npubStr}</div>\n                                </div>\n                            </div>\n                            <button onclick="deleteAccount(event, '${acc.pubkey}')" class="p-2 text-gray-300 hover:text-red-500 transition active:scale-95" title="删除本机记录">\n                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                            </button>\n                        `,
+        div.innerHTML = `\n                            <div class="flex items-center space-x-3 flex-1 min-w-0" onclick="promptLogin('${acc.pubkey}')">\n                                ${avatar}\n                                <div class="flex-1 min-w-0 pr-2">\n                                    <div class="font-bold text-gray-800 dark:text-gray-100 text-sm truncate">${safeNameStr}</div>\n                                    <div class="text-[11px] text-gray-400 font-mono truncate">${npubStr}</div>\n                                </div>\n                            </div>\n                            <button onclick="deleteAccount(event, '${acc.pubkey}')" class="p-2 text-gray-300 hover:text-red-500 transition active:scale-95" title="删除本机记录">\n                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                            </button>\n                        `,
           list.appendChild(div);
       })) : showAddAccountArea();
     }
@@ -9534,7 +9587,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             let acc = accounts.find(a => a.pubkey === accountToLogin);
             try {
               if (!acc) throw new Error("本地账号数据异常丢失");
-              privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), pubKeyHex = accountToLogin,
+              privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), acc.encPrivKey.startsWith("02") || (acc.encPrivKey = await aesEncrypt(privKeyHex, pwd),
+                  localStorage.setItem("dage_accounts", JSON.stringify(accounts))), pubKeyHex = accountToLogin,
                 sessionStorage.setItem("dage_session_pub", pubKeyHex), sessionStorage.setItem("dage_session_priv", privKeyHex),
                 closePwdVerifyModal(), await initializeApp();
             } catch (e) {
@@ -9560,10 +9614,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let acc = accounts.find(a => a.pubkey === pubKeyHex);
       try {
         if (!acc) throw new Error("本地账号数据异常丢失");
-        privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), isLocked = !1, sessionStorage.setItem("dage_session_pub", pubKeyHex),
-          sessionStorage.setItem("dage_session_priv", privKeyHex), document.getElementById("lock-screen").classList.add("hidden"),
-          document.getElementById("app-screen").classList.remove("hidden"), updateActivity(),
-          initRelayConnection();
+        privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), acc.encPrivKey.startsWith("02") || (acc.encPrivKey = await aesEncrypt(privKeyHex, pwd),
+            localStorage.setItem("dage_accounts", JSON.stringify(accounts))), isLocked = !1,
+          sessionStorage.setItem("dage_session_pub", pubKeyHex), sessionStorage.setItem("dage_session_priv", privKeyHex),
+          document.getElementById("lock-screen").classList.add("hidden"), document.getElementById("app-screen").classList.remove("hidden"),
+          updateActivity(), initRelayConnection();
       } catch (e) {
         console.error(e), alert("解锁失败！\n真实原因：" + (e.message || e)), document.getElementById("lock-pwd").value = "";
       }
@@ -9631,8 +9686,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)), await saveEncryptedData("unread_counts", unreadCounts),
           await saveEncryptedData("last_read_watermarks", lastReadWatermarks), await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps),
           await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)), await saveEncryptedData("deleted_groups", Array.from(deletedGroups)),
-          await saveEncryptedData("groups_cache", groups), await saveEncryptedData("contacts_cache", contacts),
-          await saveEncryptedData("pinned_chats", Array.from(pinnedChats)), await saveEncryptedData("hidden_chats", Array.from(hiddenChats));
+          await saveEncryptedData("ghost_nonces", Array.from(myGhostNonces)), await saveEncryptedData("groups_cache", groups),
+          await saveEncryptedData("contacts_cache", contacts), await saveEncryptedData("pinned_chats", Array.from(pinnedChats)),
+          await saveEncryptedData("hidden_chats", Array.from(hiddenChats));
         let lightProfiles = {};
         for (let pk in profiles)
           if (lightProfiles[pk] = {
@@ -9716,9 +9772,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     async function logout() {
-      _syncCacheTimer && clearTimeout(_syncCacheTimer), await executeCacheSave(), sessionStorage.removeItem("dage_session_pub"),
-        sessionStorage.removeItem("dage_session_priv"), privKeyHex = null, pubKeyHex = null,
-        isLocked = !1;
+      _syncCacheTimer && clearTimeout(_syncCacheTimer), await executeCacheSave(), _cloudSyncDebounceTimer && (clearTimeout(_cloudSyncDebounceTimer),
+          await syncBackupToCloud()), sessionStorage.removeItem("dage_session_pub"), sessionStorage.removeItem("dage_session_priv"),
+        privKeyHex = null, pubKeyHex = null, isLocked = !1;
       for (let url in wsPool) wsPool[url] && wsPool[url].close();
       wsPool = {}, window.location.reload();
     }
@@ -9753,7 +9809,15 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let dContacts = await loadEncryptedData("deleted_contacts", []);
       deletedContacts = new Set(dContacts);
       let dGroups = await loadEncryptedData("deleted_groups", []);
-      deletedGroups = new Set(dGroups), "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
+      deletedGroups = new Set(dGroups);
+      let gNonces = await loadEncryptedData("ghost_nonces", []);
+      myGhostNonces = new Set(gNonces);
+      let myProf = profiles[pubKeyHex] || accInfo || {};
+      if (document.getElementById("my-name").innerText = myProf.name || "我", myProf.picture) {
+        let picUrl = formatAvatarUrl(myProf.picture);
+        picUrl && (document.getElementById("my-avatar").innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`);
+      }
+      "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
         name: OFFICIAL_GROUP.name,
         key_hex: OFFICIAL_GROUP.key,
         type: OFFICIAL_GROUP.type,
@@ -9827,7 +9891,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               }, ws.onmessage = async event => {
                 if (isLocked) return;
                 const data = JSON.parse(event.data);
-                "EVENT" === data[0] && await handleNostrEvent(data[2]);
+                if ("EVENT" === data[0]) await handleNostrEvent(data[2]);
+                else if ("OK" === data[0]) {
+                  let eventId = data[1],
+                    isSuccess = data[2];
+                  window._ackListeners && window._ackListeners[eventId] && window._ackListeners[eventId](isSuccess);
+                }
               }, ws.onclose = () => {
                 console.warn(`⚠️ [Relay] 断开连接: ${url}`), relayStates[url].status = 0, relayStates[url].ping = -1,
                   updateRelayStatusUI(), reconnectTimers[url] = setTimeout(() => {
@@ -9867,22 +9936,24 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           pubKeyHex && (0 === state.status ? (statusText = "断开", statusColor = "text-red-500") : 1 === state.status ? (statusText = "连接中",
             statusColor = "text-yellow-500") : 2 === state.status && (statusText = "在线", statusColor = "text-green-500",
             pingText = state.ping > 0 ? `${state.ping}ms` : "--"));
-          let trustHtml = "";
+          let safeUrl = escapeHTML(url),
+            trustHtml = "";
           if (pubKeyHex && 0 === state.status && url.startsWith("wss://")) {
-            trustHtml = `<a href="${url.replace("wss://", "https://")}" target="_blank" class="ml-3 text-[11px] text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded hover:bg-red-100 transition whitespace-nowrap shadow-sm font-bold">⚠️ 信任证书</a>`;
+            trustHtml = `<a href="${escapeHTML(url.replace("wss://", "https://"))}" target="_blank" rel="noopener noreferrer" class="ml-3 text-[11px] text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded hover:bg-red-100 transition whitespace-nowrap shadow-sm font-bold">⚠️ 信任证书</a>`;
           }
           let div = document.createElement("div");
           div.className = "flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:bg-gray-800 transition rounded-lg",
-            div.innerHTML = `\n                    <div class="flex-1 min-w-0 pr-2">\n                        <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate flex items-center">\n                            ${url} ${trustHtml}\n                        </div>\n                        <div class="text-xs mt-1 flex items-center space-x-3">\n                            <span class="${statusColor} font-bold">${statusText}</span>\n                            <span class="text-gray-400">延迟: ${pingText}</span>\n                        </div>\n                    </div>\n                    <div class="flex space-x-1 shrink-0">\n                        <button onclick="copyText('${url}'); alert('节点地址已复制！')" class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition active:scale-95" title="复制该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>\n                        </button>\n                        <button onclick="removeRelayNode('${url}')" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition active:scale-95" title="删除该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                        </button>\n                    </div>\n                `,
+            div.innerHTML = `\n                    <div class="flex-1 min-w-0 pr-2">\n                        <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate flex items-center">\n                            ${safeUrl} ${trustHtml}\n                        </div>\n                        <div class="text-xs mt-1 flex items-center space-x-3">\n                            <span class="${statusColor} font-bold">${statusText}</span>\n                            <span class="text-gray-400">延迟: ${pingText}</span>\n                        </div>\n                    </div>\n                    <div class="flex space-x-1 shrink-0">\n                        <button data-url="${safeUrl}" onclick="copyText(this.getAttribute('data-url')); alert('节点地址已复制！')" class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition active:scale-95" title="复制该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>\n                        </button>\n                        <button data-url="${safeUrl}" onclick="removeRelayNode(this.getAttribute('data-url'))" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition active:scale-95" title="删除该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                        </button>\n                    </div>\n                `,
             list.appendChild(div);
         }), pubKeyHex && localRelayBlocklist.size > 0)) {
         let divTitle = document.createElement("div");
         divTitle.className = "text-xs font-bold text-gray-400 mt-5 mb-2 flex items-center",
           divTitle.innerHTML = '<div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div><span class="mx-3">🚫 本设备已屏蔽的节点</span><div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>',
           list.appendChild(divTitle), localRelayBlocklist.forEach(url => {
-            let div = document.createElement("div");
+            let safeUrl = escapeHTML(url),
+              div = document.createElement("div");
             div.className = "flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:bg-gray-800 transition rounded-lg opacity-60",
-              div.innerHTML = `\n                          <div class="flex-1 min-w-0 pr-2">\n                              <div class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate line-through">${url}</div>\n                          </div>\n                          <button onclick="restoreRelayNode('${url}')" class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg transition active:scale-95 shrink-0 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:text-green-600 dark:hover:text-green-500">恢复</button>\n                      `,
+              div.innerHTML = `\n                          <div class="flex-1 min-w-0 pr-2">\n                              <div class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate line-through">${safeUrl}</div>\n                          </div>\n                          <button data-url="${safeUrl}" onclick="restoreRelayNode(this.getAttribute('data-url'))" class="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg transition active:scale-95 shrink-0 text-xs font-bold border border-gray-200 dark:border-gray-700 hover:text-green-600 dark:hover:text-green-500">恢复</button>\n                      `,
               list.appendChild(div);
           });
       }
@@ -10026,159 +10097,163 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         content: content,
         pubkey: pubKeyHex
       };
-      return event.id = nt.getEventHash(event), event.sig = nt.getSignature(event, privKeyHex),
-        broadcastToRelays(JSON.stringify(["EVENT", event])), event;
+      event.id = nt.getEventHash(event), event.sig = nt.getSignature(event, privKeyHex);
+      let success = await broadcastToRelays(JSON.stringify(["EVENT", event]));
+      return event._send_status = success ? 1 : -1, event;
     }
 
     async function handleNostrEvent(ev) {
-      if (!seenEventIds.has(ev.id) && (seenEventIds.add(ev.id), !blocklist.has(ev.pubkey))) {
-        if (0 === ev.kind) try {
-          let newProfile = JSON.parse(ev.content);
-          if (newProfile.ln && !newProfile.lud16 && (newProfile.lud16 = newProfile.ln), profiles[ev.pubkey] = newProfile,
-            newProfile.picture) try {
-            setDBItem("dage_avatar_" + ev.pubkey, newProfile.picture);
-          } catch (e) {}
-          if (ev.pubkey === pubKeyHex) {
-            if (document.getElementById("my-name").innerText = profiles[ev.pubkey].name || "我",
-              profiles[ev.pubkey].picture) {
-              let picUrl = formatAvatarUrl(profiles[ev.pubkey].picture);
-              document.getElementById("my-avatar").innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`;
-            }
-            let accIdx = accounts.findIndex(a => a.pubkey === pubKeyHex);
-            if (accIdx > -1) {
-              let isChanged = !1;
-              profiles[pubKeyHex].name && accounts[accIdx].name !== profiles[pubKeyHex].name && (accounts[accIdx].name = profiles[pubKeyHex].name,
-                isChanged = !0), profiles[pubKeyHex].picture && accounts[accIdx].picture !== profiles[pubKeyHex].picture && (accounts[accIdx].picture = profiles[pubKeyHex].picture,
-                isChanged = !0), isChanged && localStorage.setItem("dage_accounts", JSON.stringify(accounts));
-            }
-          }
-          renderContacts(), currentChatPk === ev.pubkey && updateChatHeader(), document.getElementById("peer-profile-modal").classList.contains("hidden") || peerPkToViewGlobal !== ev.pubkey || showPeerProfileModal(peerPkToViewGlobal);
-        } catch (e) {}
-        if (3 === ev.kind && ev.pubkey === pubKeyHex) {
-          let newContacts = ev.tags.filter(t => "p" === t[0]).map(t => t[1]);
-          contacts = [...new Set([...contacts, ...newContacts])];
-          let newlyAddedGhostGids = [],
-            newlyAddedNormalGids = [];
-          if (ev.content && ev.content.length > 20) try {
-            let decrypted = await pythonNip44Decrypt(privKeyHex, pubKeyHex, ev.content);
-            if (decrypted) {
-              let data = JSON.parse(decrypted);
-              if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
-                  data._dage_ext.deleted_groups && data._dage_ext.deleted_groups.forEach(gid => deletedGroups.add(gid)),
-                  data._dage_ext.hidden_msgs && data._dage_ext.hidden_msgs.forEach(mid => hiddenMsgsSet.add(mid)),
-                  data._dage_ext.cleared_ts))
-                for (let pk in data._dage_ext.cleared_ts) clearedChatTimestamps[pk] = Math.max(clearedChatTimestamps[pk] || 0, data._dage_ext.cleared_ts[pk]);
-              if (data.groups && data.groups.forEach(g => {
-                  deletedGroups.has(g.id) || groups[g.id] || (groups[g.id] = {
-                    name: g.name,
-                    key_hex: g.key,
-                    type: g.type || 0,
-                    owner: g.owner || null
-                  }, 1 === g.type ? newlyAddedGhostGids.push(g.id) : newlyAddedNormalGids.push(g.id));
-                }), data.contacts && data.contacts.forEach(c => {
-                  deletedContacts.has(c.pubkey) || contacts.includes(c.pubkey) || contacts.push(c.pubkey),
-                    c.name && !profiles[c.pubkey] && (profiles[c.pubkey] = {
-                      name: c.name
-                    });
-                }), data.blocklist && Array.isArray(data.blocklist)) {
-                let oldSize = blocklist.size;
-                data.blocklist.forEach(pk => blocklist.add(pk)), blocklist.size !== oldSize && localStorage.setItem(`dage_blocklist_${pubKeyHex}`, JSON.stringify(Array.from(blocklist)));
+      if (!seenEventIds.has(ev.id))
+        if (ev.id === nt.getEventHash(ev) && nt.verifySignature(ev)) {
+          if (seenEventIds.add(ev.id), !blocklist.has(ev.pubkey)) {
+            if (0 === ev.kind) try {
+              let newProfile = JSON.parse(ev.content);
+              if (newProfile.ln && !newProfile.lud16 && (newProfile.lud16 = newProfile.ln), profiles[ev.pubkey] = newProfile,
+                newProfile.picture) try {
+                setDBItem("dage_avatar_" + ev.pubkey, newProfile.picture);
+              } catch (e) {}
+              if (ev.pubkey === pubKeyHex) {
+                if (document.getElementById("my-name").innerText = profiles[ev.pubkey].name || "我",
+                  profiles[ev.pubkey].picture) {
+                  let picUrl = formatAvatarUrl(profiles[ev.pubkey].picture);
+                  document.getElementById("my-avatar").innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`;
+                }
+                let accIdx = accounts.findIndex(a => a.pubkey === pubKeyHex);
+                if (accIdx > -1) {
+                  let isChanged = !1;
+                  profiles[pubKeyHex].name && accounts[accIdx].name !== profiles[pubKeyHex].name && (accounts[accIdx].name = profiles[pubKeyHex].name,
+                    isChanged = !0), profiles[pubKeyHex].picture && accounts[accIdx].picture !== profiles[pubKeyHex].picture && (accounts[accIdx].picture = profiles[pubKeyHex].picture,
+                    isChanged = !0), isChanged && localStorage.setItem("dage_accounts", JSON.stringify(accounts));
+                }
               }
-              if (data.relays && Array.isArray(data.relays)) {
-                let oldRelayCount = currentRelayUrls.length;
-                data.relays.forEach(url => {
-                  !url.startsWith("ws") || currentRelayUrls.includes(url) || localRelayBlocklist.has(url) || currentRelayUrls.push(url);
-                }), currentRelayUrls.length !== oldRelayCount && (localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
-                  initRelayConnection());
+              renderContacts(), currentChatPk === ev.pubkey && updateChatHeader(), document.getElementById("peer-profile-modal").classList.contains("hidden") || peerPkToViewGlobal !== ev.pubkey || showPeerProfileModal(peerPkToViewGlobal);
+            } catch (e) {}
+            if (3 === ev.kind && ev.pubkey === pubKeyHex) {
+              let newContacts = ev.tags.filter(t => "p" === t[0]).map(t => t[1]);
+              contacts = [...new Set([...contacts, ...newContacts])];
+              let newlyAddedGhostGids = [],
+                newlyAddedNormalGids = [];
+              if (ev.content && ev.content.length > 20) try {
+                let decrypted = await pythonNip44Decrypt(privKeyHex, pubKeyHex, ev.content);
+                if (decrypted) {
+                  let data = JSON.parse(decrypted);
+                  if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
+                      data._dage_ext.deleted_groups && data._dage_ext.deleted_groups.forEach(gid => deletedGroups.add(gid)),
+                      data._dage_ext.hidden_msgs && data._dage_ext.hidden_msgs.forEach(mid => hiddenMsgsSet.add(mid)),
+                      data._dage_ext.cleared_ts))
+                    for (let pk in data._dage_ext.cleared_ts) clearedChatTimestamps[pk] = Math.max(clearedChatTimestamps[pk] || 0, data._dage_ext.cleared_ts[pk]);
+                  if (data.groups && data.groups.forEach(g => {
+                      deletedGroups.has(g.id) || groups[g.id] || (groups[g.id] = {
+                        name: g.name,
+                        key_hex: g.key,
+                        type: g.type || 0,
+                        owner: g.owner || null
+                      }, 1 === g.type ? newlyAddedGhostGids.push(g.id) : newlyAddedNormalGids.push(g.id));
+                    }), data.contacts && data.contacts.forEach(c => {
+                      deletedContacts.has(c.pubkey) || contacts.includes(c.pubkey) || contacts.push(c.pubkey),
+                        c.name && !profiles[c.pubkey] && (profiles[c.pubkey] = {
+                          name: c.name
+                        });
+                    }), data.blocklist && Array.isArray(data.blocklist)) {
+                    let oldSize = blocklist.size;
+                    data.blocklist.forEach(pk => blocklist.add(pk)), blocklist.size !== oldSize && localStorage.setItem(`dage_blocklist_${pubKeyHex}`, JSON.stringify(Array.from(blocklist)));
+                  }
+                  if (data.relays && Array.isArray(data.relays)) {
+                    let oldRelayCount = currentRelayUrls.length;
+                    data.relays.forEach(url => {
+                      !url.startsWith("ws") || currentRelayUrls.includes(url) || localRelayBlocklist.has(url) || currentRelayUrls.push(url);
+                    }), currentRelayUrls.length !== oldRelayCount && (localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
+                      initRelayConnection());
+                  }
+                }
+              } catch (e) {
+                console.error("Kind 3 Decrypt Error:", e);
+              }
+              if (newlyAddedGhostGids.length > 0 || newlyAddedNormalGids.length > 0) {
+                let appendReq = ["REQ", "sub-append-groups-" + Date.now()];
+                newlyAddedGhostGids.length > 0 && appendReq.push({
+                  kinds: [5, 1059],
+                  "#p": newlyAddedGhostGids,
+                  limit: 100
+                }), newlyAddedNormalGids.length > 0 && appendReq.push({
+                  kinds: [5, 42, 30078],
+                  "#g": newlyAddedNormalGids,
+                  limit: 100
+                }), broadcastToRelays(JSON.stringify(appendReq));
+              }
+              let allPksToFetch = [...new Set([...contacts, ...Object.keys(messages)])];
+              return allPksToFetch.length > 0 && broadcastToRelays(JSON.stringify(["REQ", "fetch0-" + Date.now(), {
+                kinds: [0],
+                authors: allPksToFetch
+              }])), void triggerBatchUpdate(!1);
+            }
+            if (5 === ev.kind) {
+              let deletedIds = ev.tags.filter(t => "e" === t[0]).map(t => t[1]),
+                isChanged = !1;
+              return deletedIds.forEach(id => {
+                for (let pk in messages) {
+                  let targetMsg = messages[pk].find(m => m.id === id);
+                  targetMsg && targetMsg.sender === ev.pubkey && (targetMsg.text = "🔒 该消息已被撤回", delete targetMsg.image,
+                    isChanged = !0);
+                }
+              }), void(isChanged && (syncLocalEncryptedCache(), triggerBatchUpdate(!1)));
+            }
+            if (4 === ev.kind) {
+              if ("1" === localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
+              if (hiddenMsgsSet.has(ev.id)) return;
+              try {
+                let peerPk = ev.pubkey === pubKeyHex ? ev.tags.find(t => "p" === t[0])[1] : ev.pubkey;
+                if (!peerPk) return;
+                let decryptedText = await nt.nip04.decrypt(privKeyHex, peerPk, ev.content),
+                  replyId = getReplyId(ev.tags);
+                _processDecryptedMessage(peerPk, ev.id, ev.pubkey, decryptedText, ev.created_at, 4, replyId);
+              } catch (e) {}
+            }
+            if (1059 === ev.kind) {
+              if (hiddenMsgsSet.has(ev.id)) return;
+              let pTag = ev.tags.find(t => "p" === t[0]),
+                recipientPk = pTag ? pTag[1] : null,
+                decryptKey = privKeyHex,
+                isGhostGroup = !1;
+              recipientPk && groups[recipientPk] && 1 === groups[recipientPk].type && (decryptKey = groups[recipientPk].key_hex,
+                isGhostGroup = !0);
+              let unwrapped = await unwrapGift(decryptKey, ev);
+              if (unwrapped) {
+                let senderPk = unwrapped.senderPubkey;
+                if (blocklist.has(senderPk)) return;
+                let rumor = unwrapped.rumor;
+                if (hiddenMsgsSet.has(rumor.id)) return;
+                let peerPk = senderPk;
+                if (isGhostGroup) peerPk = recipientPk;
+                else if (senderPk === pubKeyHex) {
+                  let rTag = rumor.tags.find(t => "p" === t[0]);
+                  rTag && rTag[1] && (peerPk = rTag[1]);
+                }
+                let replyId = getReplyId(rumor.tags);
+                _processDecryptedMessage(peerPk, rumor.id, senderPk, rumor.content, rumor.created_at, 59, replyId);
               }
             }
-          } catch (e) {
-            console.error("Kind 3 Decrypt Error:", e);
-          }
-          if (newlyAddedGhostGids.length > 0 || newlyAddedNormalGids.length > 0) {
-            let appendReq = ["REQ", "sub-append-groups-" + Date.now()];
-            newlyAddedGhostGids.length > 0 && appendReq.push({
-              kinds: [5, 1059],
-              "#p": newlyAddedGhostGids,
-              limit: 100
-            }), newlyAddedNormalGids.length > 0 && appendReq.push({
-              kinds: [5, 42, 30078],
-              "#g": newlyAddedNormalGids,
-              limit: 100
-            }), broadcastToRelays(JSON.stringify(appendReq));
-          }
-          let allPksToFetch = [...new Set([...contacts, ...Object.keys(messages)])];
-          return allPksToFetch.length > 0 && broadcastToRelays(JSON.stringify(["REQ", "fetch0-" + Date.now(), {
-            kinds: [0],
-            authors: allPksToFetch
-          }])), void triggerBatchUpdate(!1);
-        }
-        if (5 === ev.kind) {
-          let deletedIds = ev.tags.filter(t => "e" === t[0]).map(t => t[1]),
-            isChanged = !1;
-          return deletedIds.forEach(id => {
-            for (let pk in messages) {
-              let targetMsg = messages[pk].find(m => m.id === id);
-              targetMsg && targetMsg.sender === ev.pubkey && (targetMsg.text = "🔒 该消息已被撤回", delete targetMsg.image,
-                isChanged = !0);
+            if (42 === ev.kind) {
+              if (hiddenMsgsSet.has(ev.id)) return;
+              let gTag = ev.tags.find(t => "g" === t[0]);
+              if (!gTag) return;
+              let gid = gTag[1];
+              if (!groups[gid] || 0 !== groups[gid].type) return;
+              try {
+                let grp = groups[gid],
+                  keyBytes = new Uint8Array(grp.key_hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))),
+                  raw = base64ToBytes(ev.content);
+                if (raw.length < 41 || 2 !== raw[0]) return;
+                let nonce = raw.subarray(1, 25),
+                  ciphertext = raw.subarray(25),
+                  plaintextBytes = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ciphertext, null, nonce, keyBytes),
+                  decryptedText = (new TextDecoder).decode(plaintextBytes),
+                  replyId = getReplyId(ev.tags);
+                _processDecryptedMessage(gid, ev.id, ev.pubkey, decryptedText, ev.created_at, 0, replyId);
+              } catch (e) {}
             }
-          }), void(isChanged && (syncLocalEncryptedCache(), triggerBatchUpdate(!1)));
-        }
-        if (4 === ev.kind) {
-          if ("1" === localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
-          if (hiddenMsgsSet.has(ev.id)) return;
-          try {
-            let peerPk = ev.pubkey === pubKeyHex ? ev.tags.find(t => "p" === t[0])[1] : ev.pubkey;
-            if (!peerPk) return;
-            let decryptedText = await nt.nip04.decrypt(privKeyHex, peerPk, ev.content),
-              replyId = getReplyId(ev.tags);
-            _processDecryptedMessage(peerPk, ev.id, ev.pubkey, decryptedText, ev.created_at, 4, replyId);
-          } catch (e) {}
-        }
-        if (1059 === ev.kind) {
-          if (hiddenMsgsSet.has(ev.id)) return;
-          let pTag = ev.tags.find(t => "p" === t[0]),
-            recipientPk = pTag ? pTag[1] : null,
-            decryptKey = privKeyHex,
-            isGhostGroup = !1;
-          recipientPk && groups[recipientPk] && 1 === groups[recipientPk].type && (decryptKey = groups[recipientPk].key_hex,
-            isGhostGroup = !0);
-          let unwrapped = await unwrapGift(decryptKey, ev);
-          if (unwrapped) {
-            let senderPk = unwrapped.senderPubkey;
-            if (blocklist.has(senderPk)) return;
-            let rumor = unwrapped.rumor;
-            if (hiddenMsgsSet.has(rumor.id)) return;
-            let peerPk = senderPk;
-            if (isGhostGroup) peerPk = recipientPk;
-            else if (senderPk === pubKeyHex) {
-              let rTag = rumor.tags.find(t => "p" === t[0]);
-              rTag && rTag[1] && (peerPk = rTag[1]);
-            }
-            let replyId = getReplyId(rumor.tags);
-            _processDecryptedMessage(peerPk, rumor.id, senderPk, rumor.content, rumor.created_at, 59, replyId);
           }
-        }
-        if (42 === ev.kind) {
-          if (hiddenMsgsSet.has(ev.id)) return;
-          let gTag = ev.tags.find(t => "g" === t[0]);
-          if (!gTag) return;
-          let gid = gTag[1];
-          if (!groups[gid] || 0 !== groups[gid].type) return;
-          try {
-            let grp = groups[gid],
-              keyBytes = new Uint8Array(grp.key_hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16))),
-              raw = base64ToBytes(ev.content);
-            if (raw.length < 41 || 2 !== raw[0]) return;
-            let nonce = raw.subarray(1, 25),
-              ciphertext = raw.subarray(25),
-              plaintextBytes = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(null, ciphertext, null, nonce, keyBytes),
-              decryptedText = (new TextDecoder).decode(plaintextBytes),
-              replyId = getReplyId(ev.tags);
-            _processDecryptedMessage(gid, ev.id, ev.pubkey, decryptedText, ev.created_at, 0, replyId);
-          } catch (e) {}
-        }
-      }
+        } else console.warn("⚠️ 拦截到哈希被篡改或签名伪造的恶意事件 (已被丢弃):", ev.id);
     }
 
     function _processDecryptedMessage(peerPk, msgId, senderPk, decryptedText, timestamp, encType, replyId = null) {
@@ -10379,7 +10454,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let prof = isGroup ? groups[pk] : profiles[pk] || {
               name: fallbackName
             },
-            name = prof.name || fallbackName,
+            name = String(prof.name || fallbackName),
             isOfficial = pk === OFFICIAL_GROUP.id;
           if (pk === pubKeyHex && (name = `${profiles[pubKeyHex]?.name || "我"} (备忘录 💾)`,
               prof = profiles[pubKeyHex] || {
@@ -10416,7 +10491,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             let picUrl = formatAvatarUrl(prof.picture);
             if (picUrl) avatarHtml = `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm">`;
             else {
-              avatarHtml = `<div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">${escapeHTML(name ? name.substring(0, 1) : "?")}</div>`;
+              avatarHtml = `<div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">${escapeHTML(name ? String(name).substring(0, 1) : "?")}</div>`;
             }
           }
           let btn = document.createElement("button");
@@ -10645,10 +10720,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if ("string" != typeof rawC || !rawC.trim().startsWith("{")) return null;
       try {
         let j = JSON.parse(rawC);
-        if ("history" === j.type) return j;
+        if ("history" === j.type) return Array.isArray(j.items) || (j.items = []), j;
         if (j.text && "string" == typeof j.text && j.text.trim().startsWith("{")) {
           let inner = JSON.parse(j.text);
-          if ("history" === inner.type) return inner;
+          if ("history" === inner.type) return Array.isArray(inner.items) || (inner.items = []),
+            inner;
         }
       } catch (e) {}
       return null;
@@ -10686,15 +10762,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             }
             subC.length > 20 && (subC = subC.substring(0, 20) + "..."), previews += `<div class="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">${escapeHTML(subItem.n)}: ${escapeHTML(subC)}</div>`;
           }
-          body = `\n                                    <div class="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-lg p-2.5 mt-2 cursor-pointer active:bg-gray-100 dark:bg-gray-950 transition shadow-sm" onclick="pushHistoryView('${encodeURIComponent(JSON.stringify(innerHistory))}')">\n                                        <div class="font-bold text-[13px] text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-800 pb-1 mb-1.5 truncate">📑 ${escapeHTML(subTitle)}</div>\n                                        ${previews}\n                                        <div class="text-[10px] text-blue-500 mt-2 pt-1 text-center font-medium">点击深入查看</div>\n                                    </div>`;
+          body = `\n                                    <div class="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-lg p-2.5 mt-2 cursor-pointer active:bg-gray-100 dark:bg-gray-950 transition shadow-sm" data-inner-payload="${encodeURIComponent(JSON.stringify(innerHistory))}" onclick="pushHistoryView(this.getAttribute('data-inner-payload'))">\n                                        <div class="font-bold text-[13px] text-gray-800 dark:text-gray-100 border-b border-gray-100 dark:border-gray-800 pb-1 mb-1.5 truncate">📑 ${escapeHTML(subTitle)}</div>\n                                        ${previews}\n                                        <div class="text-[10px] text-blue-500 mt-2 pt-1 text-center font-medium">点击深入查看</div>\n                                    </div>`;
         } else {
           if (c.startsWith("{")) try {
             c = JSON.parse(c).text || "";
           } catch (e) {}
           if (body = `<div class="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-wrap break-words mt-1 leading-relaxed">${linkifyAndRenderMedia(c, !1)}</div>`,
             item.i) {
-            let imgSrc = `data:image/jpeg;base64,${item.i}`;
-            body += `<div class="mt-2"><img src="${imgSrc}" class="max-w-full rounded border border-gray-200 dark:border-gray-700 shadow-sm" onclick="openImageViewer('${imgSrc}')"></div>`;
+            body += `<div class="mt-2"><img src="${`data:image/jpeg;base64,${String(item.i).replace(/[^a-zA-Z0-9+/=]/g, "")}`}" class="max-w-full rounded border border-gray-200 dark:border-gray-700 shadow-sm" onclick="openImageViewer(this.src)"></div>`;
           }
         }
         div.innerHTML = header + body, list.appendChild(div);
@@ -10794,7 +10869,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           div.onclick = () => selectContact(pk);
         let unreadBadge = unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full border-2 border-white dark:border-gray-900 shadow-sm px-1">${unread > 99 ? "99+" : unread}</div>` : "",
           picUrl = isGroup ? "" : formatAvatarUrl(prof.picture),
-          avatarInner = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-white font-bold">${prof.name ? prof.name.substring(0, 1) : "?"}</div>`;
+          avatarInner = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-white font-bold">${prof.name ? String(prof.name).substring(0, 1) : "?"}</div>`;
         if (isGroup && 1 === prof.type) avatarInner = '<div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">⚡</div>';
         else if (isGroup && 0 === prof.type) {
           avatarInner = `<div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">${isOfficial ? "📢" : "🛡️"}</div>`;
@@ -10875,7 +10950,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         avatarBox.innerHTML = `<div class="w-full h-full ${bgColor} rounded-full flex items-center justify-center text-white text-xl font-bold">${badgeIcon}</div>`,
           avatarBox.classList.replace("bg-gray-400", "bg-transparent");
       } else picUrl ? (avatarBox.innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`,
-        avatarBox.classList.replace("bg-gray-400", "bg-transparent")) : (avatarBox.innerHTML = prof.name ? prof.name.substring(0, 1) : "?",
+        avatarBox.classList.replace("bg-gray-400", "bg-transparent")) : (avatarBox.innerText = prof.name ? String(prof.name).substring(0, 1) : "?",
         avatarBox.classList.replace("bg-transparent", "bg-gray-400"));
     }
 
@@ -10900,7 +10975,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           }
         } else displayMsgs = msgs.length > 100 ? msgs.slice(-100) : msgs;
       } else {
-        let renderLimit = Math.max(100, msgs.length);
+        let renderLimit = 150;
         if (displayMsgs = msgs.length > renderLimit ? msgs.slice(-renderLimit) : msgs, msgs.length > 0) {
           let loadMoreBtn = document.createElement("div");
           loadMoreBtn.id = "load-more-btn-" + currentChatPk, loadMoreBtn.className = "text-center text-xs font-bold text-blue-600 my-4 cursor-pointer hover:underline active:scale-95 transition-transform bg-blue-50 dark:bg-gray-800 dark:text-blue-400 py-2 rounded-lg mx-auto w-48 shadow-sm",
@@ -10914,12 +10989,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             isMe = m.sender === pubKeyHex || parsed && parsed.nonce && myGhostNonces.has(parsed.nonce),
             isSelected = selectedMsgIds.has(m.id),
             encIcon = 59 === m.enc_type ? "🎁" : 0 === m.enc_type ? "📢" : "🔒",
-            dObj = new Date(1e3 * m.time),
-            timeStrShort = dObj.toLocaleTimeString([], {
+            statusIcon = "";
+          isMe && void 0 !== m.status ? 0 === m.status ? statusIcon = '<span class="ml-1 text-gray-300 animate-pulse" title="发送中">⏳</span>' : 1 === m.status ? statusIcon = '<span class="ml-1 text-blue-200" title="已送达网络">✔️</span>' : -1 === m.status && (statusIcon = '<span class="ml-1 text-red-500 font-bold" title="发送失败/网络超时">❗</span>') : isMe && void 0 === m.status && (statusIcon = '<span class="ml-1 text-blue-200 opacity-50" title="历史已送达">✔️</span>');
+          let dObj = new Date(1e3 * m.time),
+            timeStrShort = escapeHTML(dObj.toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit"
-            }) + " " + encIcon,
-            timeStrFull = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")} ${String(dObj.getHours()).padStart(2, "0")}:${String(dObj.getMinutes()).padStart(2, "0")}:${String(dObj.getSeconds()).padStart(2, "0")} ${encIcon}`,
+            }) + " " + encIcon) + statusIcon,
+            timeStrFull = escapeHTML(`${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")} ${String(dObj.getHours()).padStart(2, "0")}:${String(dObj.getMinutes()).padStart(2, "0")}:${String(dObj.getSeconds()).padStart(2, "0")} ${encIcon}`) + statusIcon,
             wrapper = document.createElement("div");
           wrapper.id = "msg-wrap-" + m.id;
           let wrapperHoverClass = isSelectMode ? "cursor-pointer hover:bg-gray-100 dark:bg-gray-950 p-1 rounded-lg" : "";
@@ -10944,7 +11021,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             let quoteBorderColor = isMe ? "border-blue-300 text-blue-100" : "border-gray-400 text-gray-500 dark:text-gray-400",
               safeOrigName = escapeHTML(origName),
               safeOrigText = escapeHTML(origText);
-            quoteHtml = `<div class="mb-1.5 p-1.5 rounded bg-black bg-opacity-10 border-l-2 ${quoteBorderColor} text-[12px] cursor-pointer hover:opacity-80 transition flex items-center" onclick="jumpToMessage(currentChatPk, '${m.reply_to_id}')">\n                      ${quoteImgHtml}\n                      <div class="min-w-0 flex-1 truncate"><span class="font-bold">${safeOrigName}:</span> ${safeOrigText}</div>\n                  </div>`;
+            quoteHtml = `<div class="mb-1.5 p-1.5 rounded bg-black bg-opacity-10 border-l-2 ${quoteBorderColor} text-[12px] cursor-pointer hover:opacity-80 transition flex items-center" data-reply-id="${escapeHTML(m.reply_to_id || "")}" onclick="jumpToMessage(currentChatPk, this.getAttribute('data-reply-id'))">\n                      ${quoteImgHtml}\n                      <div class="min-w-0 flex-1 truncate"><span class="font-bold">${safeOrigName}:</span> ${safeOrigText}</div>\n                  </div>`;
           }
           let contentHtml = "";
           if (parsed.isHistory) {
@@ -10960,11 +11037,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               } catch (e) {} else item.i && (c = "[图片] " + c);
               c.length > 20 && (c = c.substring(0, 20) + "..."), previews += `<div class="text-[11px] text-gray-500 dark:text-gray-400 truncate mt-0.5">${escapeHTML(item.n)}: ${escapeHTML(c)}</div>`;
             }
-            contentHtml = `\n                  <div class="border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg p-2.5 cursor-pointer active:bg-gray-200 transition shadow-sm w-60" onclick="openHistoryViewer('${encodeURIComponent(m.text)}')">\n                      <div class="font-bold text-[13px] text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-1 mb-1.5 truncate">${escapeHTML(title)}</div>\n                      ${previews}\n                      <div class="text-[10px] text-gray-400 mt-2 border-t border-gray-100 dark:border-gray-800 pt-1 text-center">点击查看全文</div>\n                  </div>`;
+            contentHtml = `\n                  <div class="border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg p-2.5 cursor-pointer active:bg-gray-200 transition shadow-sm w-60" data-payload="${encodeURIComponent(m.text)}" onclick="openHistoryViewer(this.getAttribute('data-payload'))">\n                      <div class="font-bold text-[13px] text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-1 mb-1.5 truncate">${escapeHTML(title)}</div>\n                      ${previews}\n                      <div class="text-[10px] text-gray-400 mt-2 border-t border-gray-100 dark:border-gray-800 pt-1 text-center">点击查看全文</div>\n                  </div>`;
           } else if (contentHtml = linkifyAndRenderMedia(parsed.text || "", isMe), parsed.imageB64) {
             let imgBorder = isMe ? "border-blue-400" : "border-gray-200 dark:border-gray-700",
-              imgSrc = `data:image/jpeg;base64,${parsed.imageB64}`,
-              imgHtml = `<img src="${imgSrc}" class="max-w-full max-h-48 rounded-lg object-contain shadow-sm border ${imgBorder} cursor-zoom-in" onclick="openImageViewer('${imgSrc}')" onload="if(this.parentNode.parentNode.parentNode.parentNode === document.getElementById('message-list')) document.getElementById('message-list').scrollTop = document.getElementById('message-list').scrollHeight">`;
+              imgHtml = `<img src="${`data:image/jpeg;base64,${parsed.imageB64}`}" class="max-w-full max-h-48 rounded-lg object-contain shadow-sm border ${imgBorder} cursor-zoom-in" onclick="openImageViewer(this.src)" onload="if(this.parentNode.parentNode.parentNode.parentNode === document.getElementById('message-list')) document.getElementById('message-list').scrollTop = document.getElementById('message-list').scrollHeight">`;
             contentHtml += contentHtml ? `<div class="mt-2 mb-1">${imgHtml}</div>` : `<div class="mb-1">${imgHtml}</div>`;
           }
           let senderNameHtml = "",
@@ -10974,7 +11050,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             sName = 1 === groups[currentChatPk].type && parsed && parsed.alias ? parsed.alias + " 🎭" : profiles[m.sender] && profiles[m.sender].name ? profiles[m.sender].name : parsed && parsed.name ? parsed.name : "用户 " + m.sender.substring(0, 6);
             let atBadge = isTargetMe ? '<span class="ml-1.5 px-1.5 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded font-bold text-[9px] shadow-sm">🎯 提到了你</span>' : "",
               safeSName = escapeHTML(sName);
-            senderNameHtml = `<div onclick="openMemberActionModal('${m.sender}', '${safeSName}')" class="text-[11px] text-gray-500 dark:text-gray-400 mb-1 ml-1 flex items-center cursor-pointer hover:text-blue-500 active:scale-95 transition-colors w-max select-none">${safeSName} ${atBadge}</div>`;
+            senderNameHtml = `<div data-pk="${escapeHTML(m.sender)}" data-name="${safeSName}" onclick="openMemberActionModal(this.getAttribute('data-pk'), this.getAttribute('data-name'))" class="text-[11px] text-gray-500 dark:text-gray-400 mb-1 ml-1 flex items-center cursor-pointer hover:text-blue-500 active:scale-95 transition-colors w-max select-none">${safeSName} ${atBadge}</div>`;
           }
           let bubbleStyleClass = isMe ? "bg-blue-600 text-white rounded-tr-sm border border-blue-600 dark:bg-blue-700 dark:border-blue-700" : "bg-white text-gray-800 rounded-tl-sm border border-gray-100 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700";
           if (isTargetMe && (bubbleStyleClass = "bg-red-50 text-red-900 rounded-tl-sm border border-red-300 shadow-md dark:bg-red-900 dark:text-red-100 dark:border-red-700"),
@@ -10994,13 +11070,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               p = profiles[pubKeyHex] || accInfo;
             }
             let picUrl = formatAvatarUrl(p.picture),
-              fallbackChar = (p.name || (isMe ? "我" : "?")).substring(0, 1);
+              fallbackChar = String(p.name || (isMe ? "我" : "?")).substring(0, 1);
             if (picUrl) avatarHtml = `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shadow-sm shrink-0 cursor-pointer hover:opacity-80 transition active:scale-95" onclick="showPeerProfileModal('${m.sender}')">`;
             else {
               avatarHtml = `<div class="w-10 h-10 rounded-full ${isMe ? "bg-blue-500" : "bg-gray-400"} flex items-center justify-center text-white text-sm font-bold shadow-sm shrink-0 cursor-pointer hover:opacity-80 transition active:scale-95" onclick="showPeerProfileModal('${m.sender}')">${escapeHTML(fallbackChar)}</div>`;
             }
           }
-          let bubbleHtml = `\n                  <div class="flex ${isMe ? "flex-row-reverse" : "flex-row"} w-full items-start mb-1 mt-1">\n                      <div class="${isMe ? "ml-2" : "mr-2"} pt-1 no-select shrink-0">\n                          ${avatarHtml}\n                      </div>\n                      <div class="flex flex-col flex-1 ${alignClass} min-w-0 no-select"\n                          ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                          ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                          oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                          ${senderNameHtml}\n                          <div class="max-w-[90%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                              ${quoteHtml}\n                              <div class="text-[15px] whitespace-pre-wrap bubble-text leading-relaxed max-h-[50vh] overflow-y-auto no-scrollbar">${contentHtml}</div>\n                              <div class="text-[11px] text-right mt-1.5 ${timeColorClass} cursor-pointer select-none hover:opacity-80 transition-opacity inline-block"\n                                   data-short="${timeStrShort}"\n                                   data-full="${timeStrFull}"\n                                   onclick="if(isSelectMode) return; event.stopPropagation(); this.innerText = this.innerText === this.getAttribute('data-short') ? this.getAttribute('data-full') : this.getAttribute('data-short');">\n                                  ${timeStrShort}\n                              </div>\n                          </div>\n                      </div>\n                  </div>\n              `;
+          let bubbleHtml = `\n                  <div class="flex ${isMe ? "flex-row-reverse" : "flex-row"} w-full items-start mb-1 mt-1">\n                      <div class="${isMe ? "ml-2" : "mr-2"} pt-1 no-select shrink-0">\n                          ${avatarHtml}\n                      </div>\n                      <div class="flex flex-col flex-1 ${alignClass} min-w-0 no-select"\n                          ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                          ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                          oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                          ${senderNameHtml}\n                          <div class="max-w-[90%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                              ${quoteHtml}\n                              <div class="text-[15px] whitespace-pre-wrap bubble-text leading-relaxed max-h-[50vh] overflow-y-auto no-scrollbar">${contentHtml}</div>\n                              <div class="text-[11px] text-right mt-1.5 ${timeColorClass} cursor-pointer select-none hover:opacity-80 transition-opacity flex items-center justify-end space-x-1"\n                                   data-short="${encodeURIComponent(timeStrShort)}"\n                                   data-full="${encodeURIComponent(timeStrFull)}"\n                                   onclick="if(isSelectMode) return; event.stopPropagation(); let s = decodeURIComponent(this.getAttribute('data-short')); let f = decodeURIComponent(this.getAttribute('data-full')); this.innerHTML = this.innerHTML === s ? f : s;">\n                                  ${timeStrShort}\n                              </div>\n                          </div>\n                      </div>\n                  </div>\n              `;
           wrapper.innerHTML = selectHtml + bubbleHtml, list.appendChild(wrapper);
         }), isLocateMode) {
         let targetIdx = msgs.findIndex(m => m.id === targetMsgId);
@@ -11070,7 +11146,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let parsed = parseMessageContent(m.text),
             searchableText = "";
           if (searchableText = parsed.isHistory && parsed.historyData ? "[聊天记录] " + (parsed.historyData.title || "") : parsed.text || "",
-            searchableText.toLowerCase().includes(keyword)) {
+            String(searchableText).toLowerCase().includes(keyword)) {
             let sName = "未知";
             sName = m.sender === pubKeyHex ? profiles[pubKeyHex] && profiles[pubKeyHex].name ? profiles[pubKeyHex].name : "我" : isGroup && 1 === groups[chatPk].type ? parsed.alias || "Anon" : profiles[m.sender] && profiles[m.sender].name ? profiles[m.sender].name : "用户",
               results.push({
@@ -11106,7 +11182,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             };
           let icon = "👤";
           res.isGroup && (icon = 1 === groups[res.chatPk].type ? "⚡" : "📢"), res.chatPk === OFFICIAL_GROUP.id && (icon = "📡");
-          let highlightRegex = new RegExp(escapeHTML(keyword), "gi"),
+          let safeKeyword = escapeHTML(keyword).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"),
+            highlightRegex = new RegExp(safeKeyword, "gi"),
             highlightSnippet = escapeHTML(snippet).replace(highlightRegex, function(match) {
               return '<span class="bg-yellow-300 dark:bg-yellow-600 text-yellow-900 dark:text-yellow-50 font-bold rounded px-1">' + match + "</span>";
             }),
@@ -11162,15 +11239,19 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               wrapEvent: wrapEvent,
               rumorId: rumorId
             } = await makeGiftWrap(grp.key_hex, currentChatPk, payloadStr, 14, tags);
-            broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])), messages[currentChatPk] || (messages[currentChatPk] = []),
-              messages[currentChatPk].push({
-                id: rumorId,
-                sender: currentChatPk,
-                text: payloadStr,
-                time: nowTs,
-                enc_type: 59,
-                reply_to_id: currentReplyId
-              });
+            messages[currentChatPk] || (messages[currentChatPk] = []);
+            let msgObj = {
+              id: rumorId,
+              sender: currentChatPk,
+              text: payloadStr,
+              time: nowTs,
+              enc_type: 59,
+              reply_to_id: currentReplyId,
+              status: 0
+            };
+            messages[currentChatPk].push(msgObj), renderMessages(!0), broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])).then(success => {
+              msgObj.status = success ? 1 : -1, renderMessages(!1), syncLocalEncryptedCache();
+            });
           } else {
             payloadObj.name = profiles[pubKeyHex]?.name || "我", payloadObj.k = pubKeyHex;
             let payloadStr = JSON.stringify(payloadObj),
@@ -11187,15 +11268,19 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             currentReplyId && tags.push(["e", currentReplyId, "", "reply"]);
             let difficulty = "feb75fb664b41f95" === currentChatPk ? 16 : 8,
               event = await minePowAndSign(privKeyHex, 42, b64Content, tags, difficulty);
-            broadcastToRelays(JSON.stringify(["EVENT", event])), messages[currentChatPk] || (messages[currentChatPk] = []),
-              messages[currentChatPk].push({
-                id: event.id,
-                sender: pubKeyHex,
-                text: payloadStr,
-                time: event.created_at,
-                enc_type: 0,
-                reply_to_id: currentReplyId
-              });
+            messages[currentChatPk] || (messages[currentChatPk] = []);
+            let msgObj = {
+              id: event.id,
+              sender: pubKeyHex,
+              text: payloadStr,
+              time: event.created_at,
+              enc_type: 0,
+              reply_to_id: currentReplyId,
+              status: 0
+            };
+            messages[currentChatPk].push(msgObj), renderMessages(!0), broadcastToRelays(JSON.stringify(["EVENT", event])).then(success => {
+              msgObj.status = success ? 1 : -1, renderMessages(!1), syncLocalEncryptedCache();
+            });
           }
         } else {
           let payloadStr = text;
@@ -11209,32 +11294,53 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               rumorId: rumorId,
               rumorEvent: rumorEvent
             } = await makeGiftWrap(privKeyHex, currentChatPk, payloadStr, 14, tags, nowTs);
-            if (broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])), currentChatPk !== pubKeyHex) {
-              let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, payloadStr, 14, tags, nowTs);
-              broadcastToRelays(JSON.stringify(["EVENT", selfWrap.wrapEvent]));
-            }
-            messages[currentChatPk] || (messages[currentChatPk] = []), messages[currentChatPk].find(m => m.id === rumorId) || messages[currentChatPk].push({
+            messages[currentChatPk] || (messages[currentChatPk] = []);
+            let msgObj = {
               id: rumorId,
               sender: pubKeyHex,
               text: payloadStr,
               time: rumorEvent.created_at,
               enc_type: 59,
-              reply_to_id: currentReplyId
+              reply_to_id: currentReplyId,
+              status: 0
+            };
+            messages[currentChatPk].find(m => m.id === rumorId) || messages[currentChatPk].push(msgObj),
+              renderMessages(!0);
+            let p1 = broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])),
+              p2 = Promise.resolve(!0);
+            if (currentChatPk !== pubKeyHex) {
+              let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, payloadStr, 14, tags, nowTs);
+              p2 = broadcastToRelays(JSON.stringify(["EVENT", selfWrap.wrapEvent]));
+            }
+            Promise.all([p1, p2]).then(results => {
+              msgObj.status = results[0] ? 1 : -1, renderMessages(!1), syncLocalEncryptedCache();
             });
           } else {
             let ciphertext = await nt.nip04.encrypt(privKeyHex, currentChatPk, payloadStr),
-              event = await publishEvent(4, ciphertext, tags);
-            messages[currentChatPk] || (messages[currentChatPk] = []), messages[currentChatPk].push({
+              event = {
+                kind: 4,
+                created_at: Math.floor(Date.now() / 1e3),
+                tags: tags,
+                content: ciphertext,
+                pubkey: pubKeyHex
+              };
+            event.id = nt.getEventHash(event), event.sig = nt.getSignature(event, privKeyHex),
+              messages[currentChatPk] || (messages[currentChatPk] = []);
+            let msgObj = {
               id: event.id,
               sender: pubKeyHex,
               text: payloadStr,
               time: event.created_at,
               enc_type: 4,
-              reply_to_id: currentReplyId
+              reply_to_id: currentReplyId,
+              status: 0
+            };
+            messages[currentChatPk].push(msgObj), renderMessages(!0), broadcastToRelays(JSON.stringify(["EVENT", event])).then(success => {
+              msgObj.status = success ? 1 : -1, renderMessages(!1), syncLocalEncryptedCache();
             });
           }
         }
-        syncLocalEncryptedCache(), renderMessages(!0), renderContacts(), updateActivity();
+        syncLocalEncryptedCache(), renderContacts(), updateActivity();
       } finally {
         btnSend && (btnSend.innerText = originalBtnText, btnSend.disabled = !1, btnSend.classList.remove("opacity-50", "cursor-not-allowed"));
       }
@@ -11281,7 +11387,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let picUrl = formatAvatarUrl(prof.picture);
           avatarBox.innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`,
             avatarBox.classList.add("bg-transparent");
-        } else avatarBox.innerHTML = prof.name ? String(prof.name).substring(0, 1) : "?",
+        } else avatarBox.innerText = prof.name ? String(prof.name).substring(0, 1) : "?",
           avatarBox.classList.add("bg-white", "dark:bg-gray-700");
         let extraContainer = document.getElementById("peer-extra-info");
         if (isGroup || targetPk === pubKeyHex) extraContainer.classList.add("hidden");
@@ -11490,7 +11596,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         if ("html" === fmt) {
           let safe_text = escapeHTML(display_text),
             text_html = safe_text ? `<span>${safe_text}</span>` : "",
-            img_tag = img_b64 ? `<br><img src='data:image/jpeg;base64,${img_b64}' style='max-width:200px;max-height:200px; border-radius:4px; margin-top:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);'>` : "";
+            safe_img_b64 = img_b64 ? String(img_b64).replace(/[^a-zA-Z0-9+/=]/g, "") : "",
+            img_tag = safe_img_b64 ? `<br><img src='data:image/jpeg;base64,${safe_img_b64}' style='max-width:200px;max-height:200px; border-radius:4px; margin-top:4px; box-shadow:0 1px 3px rgba(0,0,0,0.2);'>` : "";
           (text_html || img_tag || nested_html) && (html_out += `<div class='history-item' style='padding:4px 0; border-bottom:1px dotted #ccc;'>\n                                        <b style='color:#333;'>${h_name}</b> <span style='color:#888;font-size:11px'>({${h_ts}})</span>:\n                                        ${text_html} ${img_tag} ${nested_html}\n                                     </div>`);
         } else {
           let content_line = `${display_text}${img_b64 ? " [图片]" : ""}`;
@@ -11634,8 +11741,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                         history_block = res.txt);
                     }
                   } catch (e) {}
-                  is_hidden_history || (text_part = raw_text, d.image && ("html" === fmt ? img_html = `<br><img src='data:image/jpeg;base64,${d.image}'>` : text_part += " [图片]"),
-                    d.alias && (senderName = d.alias));
+                  if (!is_hidden_history) {
+                    if (text_part = raw_text, d.image) {
+                      let safe_b64 = String(d.image).replace(/["'<>]/g, "");
+                      "html" === fmt ? img_html = `<br><img src='data:image/jpeg;base64,${safe_b64}'>` : text_part += " [图片]";
+                    }
+                    d.alias && (senderName = d.alias);
+                  }
                 }
               } catch (e) {}
               if ("html" === fmt) {
@@ -11675,7 +11787,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         try {
           npubStr = nt.nip19.npubEncode(pk);
         } catch (e) {}
-        let name = profiles[pk]?.name || `User ${pk.substring(0, 6)}`;
+        let name = String(profiles[pk]?.name || `User ${pk.substring(0, 6)}`);
         if (isGhost && (name = "Anon"), filterText) {
           let text = filterText.toLowerCase(),
             matchName = name.toLowerCase().includes(text),
@@ -11697,7 +11809,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let picUrl = formatAvatarUrl(profiles[pk]?.picture);
           if (picUrl) avatarHtml = `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm">`;
           else {
-            avatarHtml = `<div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${escapeHTML(name ? name.substring(0, 1) : "?")}</div>`;
+            avatarHtml = `<div class="w-10 h-10 rounded-full bg-gray-300 text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${escapeHTML(name ? String(name).substring(0, 1) : "?")}</div>`;
           }
         }
         let btn = document.createElement("button");
