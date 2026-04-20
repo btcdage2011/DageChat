@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.70</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.75</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8964,7 +8964,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         if (outboxQueue.push(msgStr), processOutboxQueue(), !eventId) return resolve(!0);
         let isResolved = !1,
           timeoutTimer = setTimeout(() => {
-            isResolved || (isResolved = !0, resolve(!1));
+            isResolved || (isResolved = !0, window._ackListeners && eventId && delete window._ackListeners[eventId],
+              resolve(!1));
           }, 1e4);
         window._ackListeners || (window._ackListeners = {}), window._ackListeners[eventId] = success => {
           isResolved || (isResolved = !0, clearTimeout(timeoutTimer), delete window._ackListeners[eventId],
@@ -9223,6 +9224,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         isHistory: !1,
         historyData: null
       };
+      if (rawContent && "string" == typeof rawContent && rawContent.length > 524288) return parsed.text = "[内容过长，已被系统安全拦截]",
+        parsed;
       if (rawContent && "string" == typeof rawContent && rawContent.trim().startsWith("{")) try {
         let j = JSON.parse(rawContent);
         if ("history" === j.type) return parsed.isHistory = !0, Array.isArray(j.items) || (j.items = []),
@@ -9282,8 +9285,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         tags = [
           ["p", pubKeyHex]
         ];
-      if (contacts.forEach(pk => tags.push(["p", pk])), await publishEvent(3, cipher, tags),
-        coldHidden.length > 0) try {
+      if (await publishEvent(3, cipher, tags), coldHidden.length > 0) try {
         let coldPayload = JSON.stringify({
             type: "cold_tombstones",
             ids: coldHidden
@@ -9298,7 +9300,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function linkifyAndRenderMedia(txt, isMe) {
-      return escapeHTML(txt).replace(/(https?:\/\/[^\s]+)/g, url => url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) ? `<div class="mt-2 mb-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 text-center cursor-pointer shadow-sm" data-safe-url="${url}" onclick="let img = document.createElement('img'); img.src = this.getAttribute('data-safe-url'); img.className = 'max-w-full max-h-48 rounded-lg object-contain'; this.innerHTML = ''; this.appendChild(img); this.onclick = null;">\n                        <span class="text-blue-500 text-xs font-bold">🖼️ 点击加载外部图片 (注意: 加载将向对方服务器暴露您的 IP)</span>\n                    </div>` : `<a href="${url}" target="_blank" rel="noopener noreferrer" class="${isMe ? "text-blue-200 hover:text-white" : "text-blue-500 hover:text-blue-700"} underline break-all">${url}</a>`);
+      return escapeHTML(txt).replace(/(https?:\/\/[^\s]+)/g, url => {
+        if (url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/)) {
+          return `<div class="mt-2 mb-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 text-center cursor-pointer shadow-sm" data-safe-url="${encodeURI(url.replace(/&quot;|&#39;|&lt;|&gt;/g, ""))}" onclick="let img = document.createElement('img'); img.src = this.getAttribute('data-safe-url'); img.className = 'max-w-full max-h-48 rounded-lg object-contain'; this.innerHTML = ''; this.appendChild(img); this.onclick = null;">\n                        <span class="text-blue-500 text-xs font-bold">🖼️ 点击加载外部图片 (注意: 加载将向对方服务器暴露您的 IP)</span>\n                    </div>`;
+        }
+        let safeUrl = encodeURI(url.replace(/&quot;|&#39;|&lt;|&gt;/g, "")),
+          displayUrl = escapeHTML(url.replace(/&quot;|&#39;|&lt;|&gt;/g, ""));
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="${isMe ? "text-blue-200 hover:text-white" : "text-blue-500 hover:text-blue-700"} underline break-all">${displayUrl}</a>`;
+      });
     }
 
     function bytesToBase64(bytes) {
@@ -9359,19 +9368,25 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     function _mul(k, p) {
       let r = null,
         d = p;
-      for (; k > 0n;) 1n & k && (r = _add(r, d)), d = _add(d, d), k >>= 1n;
+      for (let i = 0n; i < 256n; i++) {
+        let bit = k >> i & 1n,
+          added = _add(r, d);
+        r = 1n === bit ? added : r, d = _add(d, d);
+      }
       return r;
     }
 
     function _liftX(xHex) {
       let x = BigInt("0x" + xHex),
+        c = (x * x * x + 7n) % _P,
         e = (_P + 1n) / 4n,
         y = 1n,
-        b = (x * x * x + 7n) % _P;
+        b = c;
       for (; e > 0n;) 1n & e && (y = y * b % _P), b = b * b % _P, e >>= 1n;
+      if (y = y % 2n == 0n ? y : _P - y, y * y % _P !== c) throw new Error("Invalid point on curve");
       return {
         x: x,
-        y: y % 2n == 0n ? y : _P - y
+        y: y
       };
     }
 
@@ -9472,10 +9487,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let seal = JSON.parse(sealJsonStr),
           realSenderPub = seal.pubkey,
           rumorJsonStr = await pythonNip44Decrypt(myPriv, realSenderPub, seal.content);
-        return rumorJsonStr ? {
+        if (!rumorJsonStr) return null;
+        let rumor = JSON.parse(rumorJsonStr);
+        if (rumor.pubkey !== realSenderPub) throw new Error("身份伪造拦截");
+        if (rumor.id !== nt.getEventHash(rumor)) throw new Error("哈希伪造拦截");
+        return {
           senderPubkey: realSenderPub,
-          rumor: JSON.parse(rumorJsonStr)
-        } : null;
+          rumor: rumor
+        };
       } catch (e) {
         return null;
       }
@@ -9503,17 +9522,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     async function manualLock() {
-      if (!pubKeyHex) return;
-      _syncCacheTimer && clearTimeout(_syncCacheTimer), await executeCacheSave(), sessionStorage.removeItem("dage_session_pub"),
-        sessionStorage.removeItem("dage_session_priv"), isLocked = !0, privKeyHex = null;
-      for (let url in wsPool) wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close());
-      wsPool = {}, document.getElementById("app-screen").classList.add("hidden"), document.getElementById("lock-screen").classList.remove("hidden");
-      let acc = accounts.find(a => a.pubkey === pubKeyHex) || {},
-        picUrl = formatAvatarUrl(profiles[pubKeyHex]?.picture || acc.picture),
-        name = profiles[pubKeyHex]?.name || acc.name || "已锁定";
-      document.getElementById("lock-avatar").innerHTML = picUrl ? `<img src="${picUrl}" class="w-full h-full object-cover">` : name.substring(0, 1),
-        document.getElementById("lock-name").innerText = name, document.getElementById("lock-pwd").value = "",
-        setTimeout(() => document.getElementById("lock-pwd").focus(), 100);
+      pubKeyHex && (_syncCacheTimer && clearTimeout(_syncCacheTimer), await executeCacheSave(),
+        sessionStorage.setItem("dage_session_pub", pubKeyHex), window.location.reload());
     }
 
     async function getLegacyAesKey(password) {
@@ -9607,16 +9617,51 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     async function deleteAccount(e, pk) {
-      if (e.stopPropagation(), !confirm("确定要从本机移除该账号吗？(本地历史消息记录也会丢失)")) return;
-      e.target.innerHTML = '<svg class="animate-spin w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>',
+      if (e.stopPropagation(), !confirm("⚠️ 危险操作确认\n\n确定要从本机移除该账号吗？\n所有与该账号相关的加密历史记录、设置和本地缓存将被物理级粉碎且不可恢复！")) return;
+      e.target.innerHTML = '<svg class="animate-spin w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>',
         accounts = accounts.filter(a => a.pubkey !== pk), localStorage.setItem("dage_accounts", JSON.stringify(accounts));
-      const encKeys = ["hidden_ids", "msg_cache", "unread_counts", "last_read_watermarks", "cleared_chat_ts", "deleted_contacts", "deleted_groups", "groups_cache", "contacts_cache", "pinned_chats", "hidden_chats", "profiles_cache"];
-      for (let k of encKeys) localStorage.removeItem(`dage_enc_${k}_${pk}`), await removeDBItem(`dage_enc_${k}_${pk}`);
-      if (void 0 !== profiles)
-        for (let p of Object.keys(profiles)) localStorage.removeItem("dage_avatar_" + p),
-          await removeDBItem("dage_avatar_" + p);
-      const plainKeys = ["dage_relay", "dage_relay_block", "dage_blocklist", "lastActive", "dage_locktime", "dage_enable_sys_notify", "dage_exited_official"];
-      for (let k of plainKeys) localStorage.removeItem(`${k}_${pk}`);
+      const suffix = `_${pk}`;
+      let lsKeysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        let key = localStorage.key(i);
+        key && key.endsWith(suffix) && lsKeysToRemove.push(key);
+      }
+      if (lsKeysToRemove.forEach(k => localStorage.removeItem(k)), !dbDisabled) try {
+        let db = await initDB();
+        await new Promise((resolve, reject) => {
+          let store = db.transaction("KvStore", "readwrite").objectStore("KvStore"),
+            req = store.getAllKeys();
+          req.onsuccess = () => {
+            let allKeys = req.result,
+              deletedCount = 0;
+            for (let key of allKeys) "string" == typeof key && key.endsWith(suffix) && (store.delete(key),
+              deletedCount++);
+            console.log(`[销毁] 已从 IndexedDB 物理粉碎 ${deletedCount} 个加密缓存碎片`), resolve();
+          }, req.onerror = () => reject(req.error);
+        });
+      } catch (err) {
+        console.error("IndexedDB 粉碎失败，可能数据库已被锁定", err);
+      }
+      if (0 === accounts.length) {
+        let avatarKeys = [];
+        for (let i = 0; i < localStorage.length; i++) localStorage.key(i).startsWith("dage_avatar_") && avatarKeys.push(localStorage.key(i));
+        if (avatarKeys.forEach(k => localStorage.removeItem(k)), !dbDisabled) try {
+          let store = (await initDB()).transaction("KvStore", "readwrite").objectStore("KvStore"),
+            req = store.getAllKeys();
+          req.onsuccess = () => {
+            req.result.forEach(key => {
+              "string" == typeof key && key.startsWith("dage_avatar_") && store.delete(key);
+            });
+          };
+        } catch (e) {}
+      } else if (pubKeyHex === pk && void 0 !== profiles)
+        for (let p of Object.keys(profiles))
+          if (localStorage.removeItem("dage_avatar_" + p),
+            !dbDisabled) try {
+            await removeDBItem("dage_avatar_" + p);
+          } catch (e) {}
+      if (pubKeyHex === pk) return sessionStorage.removeItem("dage_session_pub"), sessionStorage.removeItem("dage_session_priv"),
+        void setTimeout(() => window.location.reload(), 300);
       renderAccountList();
     }
 
@@ -9721,9 +9766,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         if (!acc) throw new Error("本地账号数据异常丢失");
         privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), acc.encPrivKey.startsWith("02") || (acc.encPrivKey = await aesEncrypt(privKeyHex, pwd),
             localStorage.setItem("dage_accounts", JSON.stringify(accounts))), isLocked = !1,
-          sessionStorage.setItem("dage_session_pub", pubKeyHex), sessionStorage.setItem("dage_session_priv", privKeyHex),
-          document.getElementById("lock-screen").classList.add("hidden"), document.getElementById("app-screen").classList.remove("hidden"),
-          updateActivity(), initRelayConnection();
+          sessionStorage.setItem("dage_session_pub", pubKeyHex), document.getElementById("lock-screen").classList.add("hidden"),
+          document.getElementById("lock-pwd").value = "", await initializeApp();
       } catch (e) {
         console.error(e), alert("解锁失败！\n真实原因：" + (e.message || e)), document.getElementById("lock-pwd").value = "";
       }
@@ -9807,7 +9851,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     async function executeCacheSave() {
       if (privKeyHex && pubKeyHex) try {
-        await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)), await saveEncryptedData("unread_counts", unreadCounts),
+        myGhostNonces.size > 500 && (myGhostNonces = new Set(Array.from(myGhostNonces).slice(-500))),
+          await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)), await saveEncryptedData("unread_counts", unreadCounts),
           await saveEncryptedData("last_read_watermarks", lastReadWatermarks), await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps),
           await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)), await saveEncryptedData("deleted_groups", Array.from(deletedGroups)),
           await saveEncryptedData("ghost_nonces", Array.from(myGhostNonces)), await saveEncryptedData("groups_cache", groups),
@@ -9826,6 +9871,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         await saveEncryptedData("profiles_cache", lightProfiles);
         let hasLegacyBigCache = !1;
         for (let pk in messages) {
+          messages[pk] && messages[pk].length > 2e3 && (messages[pk] = messages[pk].slice(-2e3));
           let currentSnap = JSON.stringify(messages[pk] || []);
           window._msgSnapshots[pk] !== currentSnap && (await saveEncryptedData("msg_" + pk, messages[pk] || []),
             window._msgSnapshots[pk] = currentSnap, hasLegacyBigCache = !0, await new Promise(r => setTimeout(r, 0)));
@@ -9859,6 +9905,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     function processImageFile(file, maxSide, quality, callback) {
       if (!file || !file.type.match("image.*")) return void alert("请选择有效的图片文件！");
+      if (file.size > 10485760) return void alert("❌ 图片体积过大！出于内存保护，最大仅允许处理 10MB 的图片。");
       const reader = new FileReader;
       reader.onload = function(e) {
         const img = new Image;
@@ -9995,7 +10042,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         }), document.getElementById("current-relay-display").innerText = currentRelayUrls.length + " 个并发节点",
         currentRelayUrls.forEach(url => {
           if (!wsPool[url] || wsPool[url].readyState !== WebSocket.OPEN) {
-            wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close());
+            wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close()), reconnectTimers[url] && (clearTimeout(reconnectTimers[url]),
+              delete reconnectTimers[url]);
             try {
               relayStates[url].status = 1, relayStates[url].startTs = Date.now();
               let ws = new WebSocket(url);
@@ -10049,9 +10097,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                 }
               }, ws.onclose = () => {
                 console.warn(`⚠️ [Relay] 断开连接: ${url}`), relayStates[url].status = 0, relayStates[url].ping = -1,
-                  updateRelayStatusUI(), reconnectTimers[url] = setTimeout(() => {
-                    isLocked || initRelayConnection();
-                  }, 5e3);
+                  updateRelayStatusUI(), reconnectTimers[url] && clearTimeout(reconnectTimers[url]),
+                  reconnectTimers[url] = setTimeout(() => {
+                    isLocked || (wsPool[url] && (wsPool[url].onclose = null, delete wsPool[url]), initRelayConnection());
+                  }, 5e3 + 2e3 * Math.random());
               }, ws.onerror = e => {
                 relayStates[url].status = 0, updateRelayStatusUI();
               };
@@ -10255,10 +10304,17 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     async function handleNostrEvent(ev) {
-      if (!seenEventIds.has(ev.id))
+      if (ev.content && ev.content.length > 524288) console.warn("⚠️ 拦截到超大畸形载荷 (DoS防护):", ev.id);
+      else if (!seenEventIds.has(ev.id))
         if (ev.id === nt.getEventHash(ev) && nt.verifySignature(ev)) {
+          if (seenEventIds.size > 3e4) {
+            let iterator = seenEventIds.keys();
+            for (let i = 0; i < 5e3; i++) seenEventIds.delete(iterator.next().value);
+          }
           if (seenEventIds.add(ev.id), !blocklist.has(ev.pubkey)) {
-            if (0 === ev.kind) try {
+            if (window._profiles_ts || (window._profiles_ts = {}), 0 === ev.kind) try {
+              if (window._profiles_ts[ev.pubkey] && ev.created_at <= window._profiles_ts[ev.pubkey]) return;
+              window._profiles_ts[ev.pubkey] = ev.created_at;
               let newProfile = JSON.parse(ev.content);
               if (newProfile.ln && !newProfile.lud16 && (newProfile.lud16 = newProfile.ln), profiles[ev.pubkey] = newProfile,
                 newProfile.picture) try {
@@ -10373,7 +10429,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             if (5 === ev.kind) {
               let deletedIds = ev.tags.filter(t => "e" === t[0]).map(t => t[1]),
                 isChanged = !1;
-              return deletedIds.forEach(id => {
+              return deletedIds.length > 100 && (deletedIds = deletedIds.slice(0, 100)), deletedIds.forEach(id => {
                 for (let pk in messages) {
                   let targetMsg = messages[pk].find(m => m.id === id);
                   targetMsg && targetMsg.sender === ev.pubkey && (targetMsg.text = "🔒 该消息已被撤回", delete targetMsg.image,
@@ -10382,7 +10438,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               }), void(isChanged && (syncLocalEncryptedCache(), triggerBatchUpdate(!1)));
             }
             if (4 === ev.kind) {
-              if ("0" !== localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
+              if ("0" !== localStorage.getItem("dage_nip04_block_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
               if (hiddenMsgsSet.has(ev.id)) return;
               try {
                 let peerPk = ev.pubkey === pubKeyHex ? ev.tags.find(t => "p" === t[0])[1] : ev.pubkey;
@@ -10440,56 +10496,58 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function _processDecryptedMessage(peerPk, msgId, senderPk, decryptedText, timestamp, encType, replyId = null) {
-      if (clearedChatTimestamps[peerPk] && timestamp <= clearedChatTimestamps[peerPk]) return;
-      if (!!!groups[peerPk] && !(senderPk === pubKeyHex) && !contacts.includes(senderPk)) {
-        if ("1" === localStorage.getItem("dage_reject_stranger_" + pubKeyHex)) return;
-      }
-      if (messages[peerPk] || (messages[peerPk] = []), !messages[peerPk].find(function(m) {
-          return m.id === msgId;
-        })) {
-        let isNewRealTimeMsg = !0;
-        timestamp <= (lastReadWatermarks[peerPk] || 0) && (isNewRealTimeMsg = !1);
-        let isAtMe = !1,
-          myName = profiles[pubKeyHex] && profiles[pubKeyHex].name ? profiles[pubKeyHex].name : "我";
-        if (groups[peerPk] && senderPk !== pubKeyHex) try {
-          let j = JSON.parse(decryptedText);
-          j.at && Array.isArray(j.at) && (j.at.includes(pubKeyHex) || j.at.includes("ALL")) && (isAtMe = !0),
-            j.text && j.text.includes("@" + myName) && (isAtMe = !0);
-        } catch (e) {}
-        if (isAtMe && (mentionCounts[peerPk] = (mentionCounts[peerPk] || 0) + 1, triggerBlinkTitle()),
-          !(senderPk === pubKeyHex) && !isBrowserActive) {
-          if ("0" !== localStorage.getItem("dage_enable_sys_notify_" + pubKeyHex)) {
-            let nSender = profiles[senderPk] && profiles[senderPk].name ? profiles[senderPk].name : "用户",
-              isGroup = !!groups[peerPk];
-            if (isGroup && 1 === groups[peerPk].type) try {
-              let j = JSON.parse(decryptedText);
-              nSender = j.alias ? j.alias : "Anon";
-            } catch (e) {
-              nSender = "Anon";
-            }
-            let notifyTitle = "",
-              notifyBody = "",
-              shouldNotify = !1;
-            isGroup ? isAtMe && (notifyTitle = "【群聊通知】" + groups[peerPk].name, notifyBody = nSender + " @你发了一条消息",
-              shouldNotify = !0) : (notifyTitle = "新私聊消息", notifyBody = nSender + " 给你发来一条消息",
-              shouldNotify = !0), shouldNotify && showSystemNotification(notifyTitle, notifyBody);
-          }
+      let safeNowTs = Math.floor(Date.now() / 1e3) + 60;
+      if (timestamp = Math.min(timestamp, safeNowTs), !(clearedChatTimestamps[peerPk] && timestamp <= clearedChatTimestamps[peerPk])) {
+        if (!!!groups[peerPk] && !(senderPk === pubKeyHex) && !contacts.includes(senderPk)) {
+          if ("1" === localStorage.getItem("dage_reject_stranger_" + pubKeyHex)) return;
         }
-        messages[peerPk].push({
-            id: msgId,
-            sender: senderPk,
-            text: decryptedText,
-            time: timestamp,
-            enc_type: encType,
-            reply_to_id: replyId,
-            isAtMe: isAtMe
-          }), messages[peerPk].sort(function(a, b) {
-            return a.time - b.time;
-          }), peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
-          isNewRealTimeMsg && hiddenChats.has(peerPk) && hiddenChats.delete(peerPk), profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
-            kinds: [0],
-            authors: [senderPk]
-          }])), triggerBatchUpdate(currentChatPk === peerPk && isNewRealTimeMsg);
+        if (messages[peerPk] || (messages[peerPk] = []), !messages[peerPk].find(function(m) {
+            return m.id === msgId;
+          })) {
+          let isNewRealTimeMsg = !0;
+          timestamp <= (lastReadWatermarks[peerPk] || 0) - 10 && (isNewRealTimeMsg = !1);
+          let isAtMe = !1,
+            myName = profiles[pubKeyHex] && profiles[pubKeyHex].name ? profiles[pubKeyHex].name : "我";
+          if (groups[peerPk] && senderPk !== pubKeyHex) try {
+            let j = JSON.parse(decryptedText);
+            j.at && Array.isArray(j.at) && (j.at.includes(pubKeyHex) && (isAtMe = !0), j.at.includes("ALL") && groups[peerPk].owner === senderPk && (isAtMe = !0)),
+              j.text && j.text.includes("@" + myName) && (isAtMe = !0);
+          } catch (e) {}
+          if (isAtMe && (mentionCounts[peerPk] = (mentionCounts[peerPk] || 0) + 1, triggerBlinkTitle()),
+            !(senderPk === pubKeyHex) && !isBrowserActive) {
+            if ("0" !== localStorage.getItem("dage_enable_sys_notify_" + pubKeyHex)) {
+              let nSender = profiles[senderPk] && profiles[senderPk].name ? profiles[senderPk].name : "用户",
+                isGroup = !!groups[peerPk];
+              if (isGroup && 1 === groups[peerPk].type) try {
+                let j = JSON.parse(decryptedText);
+                nSender = j.alias ? j.alias : "Anon";
+              } catch (e) {
+                nSender = "Anon";
+              }
+              let notifyTitle = "",
+                notifyBody = "",
+                shouldNotify = !1;
+              isGroup ? isAtMe && (notifyTitle = "【群聊通知】" + groups[peerPk].name, notifyBody = nSender + " @你发了一条消息",
+                shouldNotify = !0) : (notifyTitle = "新私聊消息", notifyBody = nSender + " 给你发来一条消息",
+                shouldNotify = !0), shouldNotify && showSystemNotification(notifyTitle, notifyBody);
+            }
+          }
+          messages[peerPk].push({
+              id: msgId,
+              sender: senderPk,
+              text: decryptedText,
+              time: timestamp,
+              enc_type: encType,
+              reply_to_id: replyId,
+              isAtMe: isAtMe
+            }), messages[peerPk].sort(function(a, b) {
+              return a.time - b.time;
+            }), peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
+            hiddenChats.has(peerPk) && hiddenChats.delete(peerPk), profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
+              kinds: [0],
+              authors: [senderPk]
+            }])), triggerBatchUpdate(currentChatPk === peerPk && isNewRealTimeMsg);
+        }
       }
     }
 
@@ -10971,13 +11029,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     function clearCurrentChatHistory() {
       currentChatPk && confirm("确定要清空与该联系人的所有消息记录吗？\n(此操作通过时间戳截断漫游，跨设备强制生效且无法恢复)") && (messages[currentChatPk] = [],
-        unreadCounts[currentChatPk] = 0, clearedChatTimestamps[currentChatPk] = Math.floor(Date.now() / 1e3),
+        unreadCounts[currentChatPk] = 0, clearedChatTimestamps[currentChatPk] = Math.floor(Date.now() / 1e3) - 60,
         savePrivacyStateImmediately(), syncLocalEncryptedCache(), triggerCloudSync(), renderMessages(!1),
         renderContacts());
     }
 
     function clearCurrentChatHistoryForHide(pk) {
-      messages[pk] = [], unreadCounts[pk] = 0, clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3),
+      messages[pk] = [], unreadCounts[pk] = 0, clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3) - 60,
         savePrivacyStateImmediately(), triggerCloudSync();
     }
 
@@ -11395,6 +11453,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       btnSend && (originalBtnText = btnSend.innerText, btnSend.innerText = "发送中...", btnSend.disabled = !0,
         btnSend.classList.add("opacity-50", "cursor-not-allowed")), await new Promise(r => setTimeout(r, 20));
       try {
+        let isGroup = !!groups[currentChatPk];
+        if (!isGroup && currentChatPk && !/^[0-9a-f]{64}$/i.test(currentChatPk)) throw new Error("目标身份标识包含非法字符，拒绝执行底层加密运算。");
         let payloadObj = {
           text: text
         };
@@ -11402,8 +11462,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           clearPendingImage();
         let currentReplyId = replyTargetId;
         cancelReply();
-        let isGroup = !!groups[currentChatPk],
-          nowTs = Math.floor(Date.now() / 1e3),
+        let nowTs = Math.floor(Date.now() / 1e3),
           finalMentionPks = [];
         if (isGroup) {
           for (let mName in pendingMentions)
@@ -11527,6 +11586,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           }
         }
         syncLocalEncryptedCache(), renderContacts(), updateActivity();
+      } catch (cryptoError) {
+        console.error("【密码学引擎熔断拦截】:", cryptoError), alert("❌ 消息发送失败，加密运算被拒绝：\n\n该目标对象的密钥可能存在异常格式或被恶意篡改（不在标准曲线上）。出于安全保护，操作已被拦截。");
       } finally {
         btnSend && (btnSend.innerText = originalBtnText, btnSend.disabled = !1, btnSend.classList.remove("opacity-50", "cursor-not-allowed"));
       }
@@ -11668,7 +11729,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       document.getElementById("edit-enable-notify").checked = "0" !== notifySetting;
       let rejectStranger = localStorage.getItem("dage_reject_stranger_" + pubKeyHex);
       document.getElementById("edit-reject-stranger").checked = "1" === rejectStranger;
-      let rejectNip04 = localStorage.getItem("dage_reject_nip04_" + pubKeyHex);
+      let rejectNip04 = localStorage.getItem("dage_nip04_block_" + pubKeyHex);
       document.getElementById("edit-reject-nip04").checked = "0" !== rejectNip04;
       let skInput = document.getElementById("my-nsec-display");
       skInput.value = "••••••••••••••", skInput.type = "password", document.getElementById("btn-toggle-key").innerText = "显示",
@@ -11705,7 +11766,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let isRejectStranger = document.getElementById("edit-reject-stranger").checked;
       localStorage.setItem("dage_reject_stranger_" + pubKeyHex, isRejectStranger ? "1" : "0");
       let isRejectNip04 = document.getElementById("edit-reject-nip04").checked;
-      localStorage.setItem("dage_reject_nip04_" + pubKeyHex, isRejectNip04 ? "1" : "0");
+      localStorage.setItem("dage_nip04_block_" + pubKeyHex, isRejectNip04 ? "1" : "0");
       let name = document.getElementById("edit-name").value.trim(),
         pic = document.getElementById("edit-avatar").value.trim(),
         about = document.getElementById("edit-about").value.trim(),
@@ -11758,6 +11819,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function renderItemsRecursive(items, level, fmt) {
+      if (level > 10) return {
+        html: "<div class='history-card' style='color:red;font-size:12px;padding:5px;'>[嵌套层级过深，已安全阻断]</div>",
+        txt: ">> [嵌套层级过深，已安全阻断]\n"
+      };
       let html_out = "",
         txt_out = "",
         indent_str = "    ".repeat(level + 1);
@@ -11896,7 +11961,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if (sessionsToExport.forEach(sid => {
           let msgs = messages[sid] || [];
           if (s_ts > 0 && (msgs = msgs.filter(m => m.time >= s_ts)), e_ts > 0 && (msgs = msgs.filter(m => m.time <= e_ts)),
-            0 === msgs.length) return;
+            msgs = msgs.filter(m => !hiddenMsgsSet.has(m.id) && "🔒 该消息已被撤回" !== m.text), 0 === msgs.length) return;
           totalExportedMsgs += msgs.length;
           let header = `Session: ${escapeHTML(!!groups[sid] ? groups[sid].name : profiles[sid]?.name || "Unknown")} (${sid})`;
           exportData += "html" === fmt ? `<div class='clear'></div><div class='session-header'>${header}</div>` : `\n\n${header}\n--------------------\n`,
@@ -12077,8 +12142,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if (isGhost) keyHex = nt.generatePrivateKey(), gid = nt.getPublicKey(keyHex);
       else {
         const randBytes = sodium.randombytes_buf(32);
-        keyHex = Array.from(randBytes).map(b => b.toString(16).padStart(2, "0")).join(""),
-          gid = (await sha256Hex(nameInput + pubKeyHex)).substring(0, 16);
+        keyHex = Array.from(randBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+        let entropy = Array.from(sodium.randombytes_buf(8)).map(b => b.toString(16)).join("");
+        gid = (await sha256Hex(nameInput + pubKeyHex + Date.now().toString() + entropy)).substring(0, 16);
       }
       groups[gid] = {
           name: nameInput,
@@ -12308,11 +12374,15 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     function scanQrFromFile(event) {
       const file = event.target.files[0];
-      file && (html5QrCode || (html5QrCode = new Html5Qrcode("qr-reader")), html5QrCode.scanFile(file, !0).then(decodedText => {
-        stopQrScan(), handleScanResult(decodedText);
-      }).catch(err => {
-        alert("❌ 无法从该图片中识别到二维码！");
-      }), event.target.value = "");
+      if (file) {
+        if (file.size > 10485760) return alert("❌ 图片体积过大！出于内存保护，二维码扫描最大仅支持 10MB 的图片。"),
+          void(event.target.value = "");
+        html5QrCode || (html5QrCode = new Html5Qrcode("qr-reader")), html5QrCode.scanFile(file, !0).then(decodedText => {
+          stopQrScan(), handleScanResult(decodedText);
+        }).catch(err => {
+          alert("❌ 无法从该图片中识别到二维码！");
+        }), event.target.value = "";
+      }
     }
 
     function stopQrScan() {
