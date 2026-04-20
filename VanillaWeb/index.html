@@ -8931,6 +8931,23 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       type: 0
     };
 
+    let outboxQueue = [],
+      isSendingQueue = !1;
+
+    async function processOutboxQueue() {
+      if (!isSendingQueue) {
+        for (isSendingQueue = !0; outboxQueue.length > 0;) {
+          let msgStr = outboxQueue.shift();
+          for (let url in wsPool) {
+            let ws = wsPool[url];
+            ws && ws.readyState === WebSocket.OPEN && ws.send(msgStr);
+          }
+          await new Promise(r => setTimeout(r, 100));
+        }
+        isSendingQueue = !1;
+      }
+    }
+
     function broadcastToRelays(msgStr) {
       return new Promise(resolve => {
         let sentCount = 0,
@@ -8941,10 +8958,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         } catch (e) {}
         for (let url in wsPool) {
           let ws = wsPool[url];
-          ws && ws.readyState === WebSocket.OPEN && (ws.send(msgStr), sentCount++);
+          ws && ws.readyState === WebSocket.OPEN && sentCount++;
         }
         if (0 === sentCount) return console.warn("⚠️ [网络] 没有可用的 Relay 节点，消息可能发送失败！"), resolve(!1);
-        if (!eventId) return resolve(!0);
+        if (outboxQueue.push(msgStr), processOutboxQueue(), !eventId) return resolve(!0);
         let isResolved = !1,
           timeoutTimer = setTimeout(() => {
             isResolved || (isResolved = !0, resolve(!1));
@@ -9350,7 +9367,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       _mul(privBigInt, {
         x: BigInt("0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),
         y: BigInt("0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")
-      }).y % 2n != 0n && (privBigInt = _P - privBigInt);
+      }).y % 2n != 0n && (privBigInt = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n - privBigInt);
       let sharedPoint = _mul(privBigInt, pubPoint),
         sharedBytes = new Uint8Array(33);
       sharedBytes[0] = sharedPoint.y % 2n == 0n ? 2 : 3;
@@ -9399,15 +9416,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     async function makeGiftWrap(myPriv, targetPub, contentStr, kind = 14, extraTags = [], forcedTs = null) {
       let now = forcedTs || Math.floor(Date.now() / 1e3),
         myPub = nt.getPublicKey(myPriv),
-        safeTags = [...extraTags];
-      safeTags.push(["nonce", Math.random().toString().substring(2, 10)]);
-      let rumor = {
-        pubkey: myPub,
-        created_at: now,
-        kind: kind,
-        tags: safeTags,
-        content: contentStr
-      };
+        rumor = {
+          pubkey: myPub,
+          created_at: now,
+          kind: kind,
+          tags: extraTags,
+          content: contentStr
+        };
       rumor.id = nt.getEventHash(rumor);
       let seal = {
         pubkey: myPub,
@@ -10770,20 +10785,21 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         }
       } else {
         let finalPayloadStr = payloadStr;
-        if (payloadStr.startsWith('{"type":"history"') && (finalPayloadStr = JSON.stringify({
-            text: payloadStr
-          })), useNip59) {
+        payloadStr.startsWith('{"type":"history"') && (finalPayloadStr = JSON.stringify({
+          text: payloadStr
+        }));
+        let tags = [
+          ["p", targetPk],
+          ["nonce", Math.random().toString().substring(2, 10)]
+        ];
+        if (useNip59) {
           let {
             wrapEvent: wrapEvent,
             rumorId: rumorId,
             rumorEvent: rumorEvent
-          } = await makeGiftWrap(privKeyHex, targetPk, finalPayloadStr, 14, [
-            ["p", targetPk]
-          ]);
+          } = await makeGiftWrap(privKeyHex, targetPk, finalPayloadStr, 14, tags);
           if (broadcastToRelays(JSON.stringify(["EVENT", wrapEvent])), targetPk !== pubKeyHex) {
-            let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, finalPayloadStr, 14, [
-              ["p", targetPk]
-            ]);
+            let selfWrap = await makeGiftWrap(privKeyHex, pubKeyHex, finalPayloadStr, 14, tags);
             broadcastToRelays(JSON.stringify(["EVENT", selfWrap.wrapEvent]));
           }
           messages[targetPk] || (messages[targetPk] = []), messages[targetPk].push({
@@ -10795,9 +10811,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           });
         } else {
           let ciphertext = await nt.nip04.encrypt(privKeyHex, targetPk, finalPayloadStr),
-            event = await publishEvent(4, ciphertext, [
-              ["p", targetPk]
-            ]);
+            event = await publishEvent(4, ciphertext, tags);
           messages[targetPk] || (messages[targetPk] = []), messages[targetPk].push({
             id: event.id,
             sender: pubKeyHex,
@@ -11409,7 +11423,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let tags = [
             ["p", currentChatPk]
           ];
-          if (currentReplyId && tags.push(["e", currentReplyId, "", "reply"]), useNip59) {
+          if (currentReplyId && tags.push(["e", currentReplyId, "", "reply"]), tags.push(["nonce", Math.random().toString().substring(2, 10)]),
+            useNip59) {
             let {
               wrapEvent: wrapEvent,
               rumorId: rumorId,
