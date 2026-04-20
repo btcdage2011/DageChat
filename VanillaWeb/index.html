@@ -8821,7 +8821,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         await saveEncryptedData("unread_counts", unreadCounts), await saveEncryptedData("last_read_watermarks", lastReadWatermarks),
           await saveEncryptedData("cleared_chat_ts", clearedChatTimestamps), await saveEncryptedData("deleted_contacts", Array.from(deletedContacts)),
           await saveEncryptedData("deleted_groups", Array.from(deletedGroups)), await saveEncryptedData("hidden_ids", Array.from(hiddenMsgsSet)),
-          await saveEncryptedData("ghost_nonces", Array.from(myGhostNonces));
+          await saveEncryptedData("ghost_nonces", Array.from(myGhostNonces)), await saveEncryptedData("hidden_chats", Array.from(hiddenChats));
       } catch (e) {}
     }
 
@@ -9263,6 +9263,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           name: profiles[pk] && profiles[pk].name ? profiles[pk].name : ""
         })),
         hiddenArray = Array.from(hiddenMsgsSet),
+        hotHidden = hiddenArray.length > 300 ? hiddenArray.slice(-300) : hiddenArray,
+        coldHidden = hiddenArray.length > 300 ? hiddenArray.slice(0, hiddenArray.length - 300) : [],
         payload = JSON.stringify({
           groups: groupsList,
           contacts: contactsList,
@@ -9273,14 +9275,26 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             deleted_contacts: Array.from(deletedContacts),
             deleted_groups: Array.from(deletedGroups),
             cleared_ts: clearedChatTimestamps,
-            hidden_msgs: hiddenArray.length > 300 ? hiddenArray.slice(-300) : hiddenArray
+            hidden_msgs: hotHidden
           }
         }),
         cipher = await pythonNip44Encrypt(privKeyHex, pubKeyHex, payload),
         tags = [
           ["p", pubKeyHex]
         ];
-      contacts.forEach(pk => tags.push(["p", pk])), await publishEvent(3, cipher, tags);
+      if (contacts.forEach(pk => tags.push(["p", pk])), await publishEvent(3, cipher, tags),
+        coldHidden.length > 0) try {
+        let coldPayload = JSON.stringify({
+            type: "cold_tombstones",
+            ids: coldHidden
+          }),
+          coldCipher = await pythonNip44Encrypt(privKeyHex, pubKeyHex, coldPayload);
+        await publishEvent(30078, coldCipher, [
+          ["d", "dage_cold_tombstones"]
+        ]);
+      } catch (e) {
+        console.error("Cold storage sync error:", e);
+      }
     }
 
     function linkifyAndRenderMedia(txt, isMe) {
@@ -10018,6 +10032,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                   kinds: [3],
                   authors: [pubKeyHex],
                   limit: 1
+                }, {
+                  kinds: [30078],
+                  authors: [pubKeyHex],
+                  "#d": ["dage_cold_tombstones"],
+                  limit: 1
                 }]));
               }, ws.onmessage = async event => {
                 if (isLocked) return;
@@ -10276,8 +10295,18 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                   if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
                       data._dage_ext.deleted_groups && data._dage_ext.deleted_groups.forEach(gid => deletedGroups.add(gid)),
                       data._dage_ext.hidden_msgs && data._dage_ext.hidden_msgs.forEach(mid => hiddenMsgsSet.add(mid)),
-                      data._dage_ext.cleared_ts))
-                    for (let pk in data._dage_ext.cleared_ts) clearedChatTimestamps[pk] = Math.max(clearedChatTimestamps[pk] || 0, data._dage_ext.cleared_ts[pk]);
+                      data._dage_ext.cleared_ts)) {
+                    let hasPurged = !1;
+                    for (let pk in data._dage_ext.cleared_ts) {
+                      let newTs = data._dage_ext.cleared_ts[pk];
+                      if (clearedChatTimestamps[pk] = Math.max(clearedChatTimestamps[pk] || 0, newTs),
+                        messages[pk]) {
+                        let oldLen = messages[pk].length;
+                        messages[pk] = messages[pk].filter(m => m.time > clearedChatTimestamps[pk]), messages[pk].length !== oldLen && (hasPurged = !0);
+                      }
+                    }
+                    hasPurged && syncLocalEncryptedCache();
+                  }
                   if (data.groups && data.groups.forEach(g => {
                       deletedGroups.has(g.id) || groups[g.id] || (groups[g.id] = {
                         name: g.name,
@@ -10323,6 +10352,24 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                 authors: allPksToFetch
               }])), void triggerBatchUpdate(!1);
             }
+            if (30078 === ev.kind && ev.pubkey === pubKeyHex) {
+              let dTag = ev.tags.find(t => "d" === t[0]);
+              if (dTag && "dage_cold_tombstones" === dTag[1] && ev.content) try {
+                let decrypted = await pythonNip44Decrypt(privKeyHex, pubKeyHex, ev.content);
+                if (decrypted) {
+                  let data = JSON.parse(decrypted);
+                  if ("cold_tombstones" === data.type && Array.isArray(data.ids)) {
+                    let oldSize = hiddenMsgsSet.size;
+                    if (data.ids.forEach(id => hiddenMsgsSet.add(id)), hiddenMsgsSet.size !== oldSize) {
+                      for (let pk in messages) messages[pk] = messages[pk].filter(m => !hiddenMsgsSet.has(m.id));
+                      syncLocalEncryptedCache(), triggerBatchUpdate(!1);
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error("Cold tombstone decrypt error:", e);
+              }
+            }
             if (5 === ev.kind) {
               let deletedIds = ev.tags.filter(t => "e" === t[0]).map(t => t[1]),
                 isChanged = !1;
@@ -10335,7 +10382,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               }), void(isChanged && (syncLocalEncryptedCache(), triggerBatchUpdate(!1)));
             }
             if (4 === ev.kind) {
-              if ("1" === localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
+              if ("0" !== localStorage.getItem("dage_reject_nip04_" + pubKeyHex) && ev.pubkey !== pubKeyHex) return;
               if (hiddenMsgsSet.has(ev.id)) return;
               try {
                 let peerPk = ev.pubkey === pubKeyHex ? ev.tags.find(t => "p" === t[0])[1] : ev.pubkey;
@@ -10439,7 +10486,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           }), messages[peerPk].sort(function(a, b) {
             return a.time - b.time;
           }), peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
-          profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
+          isNewRealTimeMsg && hiddenChats.has(peerPk) && hiddenChats.delete(peerPk), profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
             kinds: [0],
             authors: [senderPk]
           }])), triggerBatchUpdate(currentChatPk === peerPk && isNewRealTimeMsg);
@@ -10923,13 +10970,15 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function clearCurrentChatHistory() {
-      if (!currentChatPk) return;
-      let msgs = messages[currentChatPk] || [];
-      if (0 === msgs.length) return alert("暂无聊天记录");
-      confirm("确定要清空与该联系人的所有本地消息记录吗？\n(清空后无法恢复，且不会影响对方的记录)") && (msgs.forEach(m => hiddenMsgsSet.add(m.id)),
-        messages[currentChatPk] = [], unreadCounts[currentChatPk] = 0, clearedChatTimestamps[currentChatPk] = Math.floor(Date.now() / 1e3),
+      currentChatPk && confirm("确定要清空与该联系人的所有消息记录吗？\n(此操作通过时间戳截断漫游，跨设备强制生效且无法恢复)") && (messages[currentChatPk] = [],
+        unreadCounts[currentChatPk] = 0, clearedChatTimestamps[currentChatPk] = Math.floor(Date.now() / 1e3),
         savePrivacyStateImmediately(), syncLocalEncryptedCache(), triggerCloudSync(), renderMessages(!1),
         renderContacts());
+    }
+
+    function clearCurrentChatHistoryForHide(pk) {
+      messages[pk] = [], unreadCounts[pk] = 0, clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3),
+        savePrivacyStateImmediately(), triggerCloudSync();
     }
 
     function renderContacts() {
@@ -11046,9 +11095,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function selectContact(pk) {
-      peerPkToView = pk, currentChatPk = pk, lastReadWatermarks[pk] = Math.floor(Date.now() / 1e3),
-        unreadCounts[pk] && (unreadCounts[pk] = 0), savePrivacyStateImmediately(), mentionCounts[pk] && (mentionCounts[pk] = 0),
-        titleBlinkTimer && (clearInterval(titleBlinkTimer), titleBlinkTimer = null, document.title = originalTitle);
+      peerPkToView = pk, currentChatPk = pk, hiddenChats.has(pk) && hiddenChats.delete(pk),
+        lastReadWatermarks[pk] = Math.floor(Date.now() / 1e3), unreadCounts[pk] && (unreadCounts[pk] = 0),
+        savePrivacyStateImmediately(), mentionCounts[pk] && (mentionCounts[pk] = 0), titleBlinkTimer && (clearInterval(titleBlinkTimer),
+          titleBlinkTimer = null, document.title = originalTitle);
       let mentionBtn = document.getElementById("btn-mention");
       mentionBtn && (groups[pk] ? mentionBtn.classList.remove("hidden") : mentionBtn.classList.add("hidden")),
         exitSelectMode(), renderContacts(), updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
@@ -11619,7 +11669,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let rejectStranger = localStorage.getItem("dage_reject_stranger_" + pubKeyHex);
       document.getElementById("edit-reject-stranger").checked = "1" === rejectStranger;
       let rejectNip04 = localStorage.getItem("dage_reject_nip04_" + pubKeyHex);
-      document.getElementById("edit-reject-nip04").checked = "1" === rejectNip04;
+      document.getElementById("edit-reject-nip04").checked = "0" !== rejectNip04;
       let skInput = document.getElementById("my-nsec-display");
       skInput.value = "••••••••••••••", skInput.type = "password", document.getElementById("btn-toggle-key").innerText = "显示",
         updateProfileAvatarPreview(), "function" == typeof switchProfileTab && switchProfileTab("profile"),
@@ -12306,8 +12356,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     function loadMoreHistoryFromNetwork(chatPk) {
       let msgs = messages[chatPk] || [];
       if (0 === msgs.length) return;
-      let oldestTs = msgs[0].time,
-        isGroup = !!groups[chatPk],
+      let oldestTs = msgs[0].time;
+      if (oldestTs < Math.floor(Date.now() / 1e3) - 15552e3 && !confirm("⚠️ 提示：您正在向网络深度拉取超过 6 个月前的远古聊天记录。\n\n为保证设备性能，极早期的本地单条删除状态（墓碑）可能已脱离冷热存储区被释放。继续拉取可能会导致某些被删消息重新出现。\n\n是否继续拉取？")) return;
+      let isGroup = !!groups[chatPk],
         isGhost = isGroup && 1 === groups[chatPk].type,
         subId = "history-" + chatPk.substring(0, 6) + "-" + Date.now(),
         req = ["REQ", subId];
@@ -12423,12 +12474,6 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           currentChatPk === pk && closeChat(new Event("close"))) : "delete" === action && confirm("确定要删除该聊天吗？\n所有本地记录将被彻底清空。") && (clearCurrentChatHistoryForHide(pk),
           hiddenChats.add(pk), currentChatPk === pk && closeChat(new Event("close"))), syncLocalEncryptedCache(),
         renderContacts(), closeSessionActionModal());
-    }
-
-    function clearCurrentChatHistoryForHide(pk) {
-      (messages[pk] || []).forEach(m => hiddenMsgsSet.add(m.id)), messages[pk] = [], unreadCounts[pk] = 0,
-        clearedChatTimestamps[pk] = Math.floor(Date.now() / 1e3), savePrivacyStateImmediately(),
-        triggerCloudSync();
     }
 
     contactsListEl.addEventListener("touchstart", e => {
