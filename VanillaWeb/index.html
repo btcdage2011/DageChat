@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.67</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.68</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -9682,8 +9682,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     async function saveEncryptedData(key, obj) {
       if (privKeyHex && pubKeyHex) try {
         let jsonStr = JSON.stringify(obj),
-          ciphertext = await nt.nip04.encrypt(privKeyHex, pubKeyHex, jsonStr);
-        await setDBItem(`dage_enc_${key}_${pubKeyHex}`, ciphertext);
+          ciphertext = await nt.nip04.encrypt(privKeyHex, pubKeyHex, jsonStr),
+          fullKey = `dage_enc_${key}_${pubKeyHex}`;
+        try {
+          await setDBItem(fullKey, ciphertext), localStorage.removeItem(fullKey);
+        } catch (dbErr) {
+          localStorage.setItem(fullKey, ciphertext);
+        }
       } catch (e) {
         console.error("Save DB Error:", e);
       }
@@ -9691,11 +9696,16 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     async function loadEncryptedData(key, defaultVal) {
       if (!privKeyHex || !pubKeyHex) return defaultVal;
+      let fullKey = `dage_enc_${key}_${pubKeyHex}`,
+        ciphertext = null;
       try {
-        let fullKey = `dage_enc_${key}_${pubKeyHex}`,
-          ciphertext = await getDBItem(fullKey);
-        if (ciphertext || (ciphertext = localStorage.getItem(fullKey), ciphertext && (await setDBItem(fullKey, ciphertext),
-            localStorage.removeItem(fullKey))), !ciphertext) return defaultVal;
+        ciphertext = await getDBItem(fullKey);
+      } catch (e) {}
+      if (!ciphertext && (ciphertext = localStorage.getItem(fullKey), ciphertext)) try {
+        await setDBItem(fullKey, ciphertext), localStorage.removeItem(fullKey);
+      } catch (e) {}
+      if (!ciphertext) return defaultVal;
+      try {
         let plaintext = await nt.nip04.decrypt(privKeyHex, pubKeyHex, ciphertext);
         return JSON.parse(plaintext);
       } catch (e) {
@@ -9825,9 +9835,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         unreadCounts = await loadEncryptedData("unread_counts", {}), lastReadWatermarks = await loadEncryptedData("last_read_watermarks", {}),
         groups = await loadEncryptedData("groups_cache", {}), profiles = await loadEncryptedData("profiles_cache", {});
       for (let pk in profiles) {
-        let savedPic = await getDBItem("dage_avatar_" + pk);
-        savedPic || (savedPic = localStorage.getItem("dage_avatar_" + pk), savedPic && (await setDBItem("dage_avatar_" + pk, savedPic),
-          localStorage.removeItem("dage_avatar_" + pk))), savedPic && (profiles[pk].picture = savedPic);
+        let savedPic = null;
+        try {
+          savedPic = await getDBItem("dage_avatar_" + pk);
+        } catch (e) {}
+        if (!savedPic && (savedPic = localStorage.getItem("dage_avatar_" + pk), savedPic)) try {
+          await setDBItem("dage_avatar_" + pk, savedPic), localStorage.removeItem("dage_avatar_" + pk);
+        } catch (e) {}
+        savedPic && (profiles[pk].picture = savedPic);
       }
       contacts = await loadEncryptedData("contacts_cache", []);
       let accInfo = accounts.find(a => a.pubkey === pubKeyHex);
@@ -10163,6 +10178,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                 newlyAddedNormalGids = [];
               if (ev.content && ev.content.length > 20) try {
                 let decrypted = await pythonNip44Decrypt(privKeyHex, pubKeyHex, ev.content);
+                if (!decrypted) try {
+                  decrypted = await nt.nip04.decrypt(privKeyHex, pubKeyHex, ev.content);
+                } catch (e) {}
                 if (decrypted) {
                   let data = JSON.parse(decrypted);
                   if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
