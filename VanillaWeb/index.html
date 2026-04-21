@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.75</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.76</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -9237,6 +9237,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             if ("history" === innerJ.type) return parsed.isHistory = !0, Array.isArray(innerJ.items) || (innerJ.items = []),
               parsed.historyData = innerJ, parsed.text = "", j.alias && (parsed.alias = j.alias),
               j.nonce && (parsed.nonce = j.nonce), j.name && (parsed.name = j.name), parsed;
+            void 0 === innerJ.image && void 0 === innerJ.text || (innerJ.image && (j.image = innerJ.image),
+              innerText = void 0 !== innerJ.text ? String(innerJ.text) : "");
           } catch (e) {}
           parsed.text = String(innerText);
         }
