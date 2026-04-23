@@ -8231,7 +8231,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             </div>
           </div>
           <div id="peer-modal-relays-container" class="hidden">
-            <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">公开节点 (Relays)</label>
+            <div class="flex justify-between items-end mb-0.5">
+              <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider">公开节点 (Relays)</label>
+              <button onclick="copyText(document.getElementById('peer-modal-relays').innerText); alert('对方的节点列表已复制！')" class="text-[10px] text-blue-500 hover:text-blue-700 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded transition active:scale-95 font-bold shadow-sm">复制</button>
+            </div>
             <div id="peer-modal-relays" class="text-gray-600 dark:text-gray-300 text-[11px] whitespace-pre-wrap break-words bg-gray-50 dark:bg-gray-800 p-2 rounded border border-gray-100 dark:border-gray-800 font-mono leading-relaxed"></div>
           </div>
         </div>
@@ -8500,7 +8503,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         </div>
         <div class="flex items-center justify-between mt-2">
           <p class="text-[11px] text-gray-400 mr-2">提示：连接失败请点列表中的“信任证书”。</p>
-          <button onclick="forceSyncRelaysToCloud()" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 text-[11px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition active:scale-95 shadow-sm shrink-0">🔄 以当前列表覆盖云端</button>
+          <div class="flex space-x-2 shrink-0">
+            <button onclick="copyText(currentRelayUrls.join(', ')); alert('所有本地节点已复制！')" class="px-3 py-1.5 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 text-[11px] font-bold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition active:scale-95 shadow-sm">📄 复制列表</button>
+            <button onclick="forceSyncRelaysToCloud()" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 text-[11px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition active:scale-95 shadow-sm">🔄 以当前列表覆盖云端</button>
+          </div>
         </div>
       </div>
 
