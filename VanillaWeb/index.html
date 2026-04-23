@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.79</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.80</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -10064,7 +10064,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let savedBlocklist = localStorage.getItem(`dage_blocklist_${pubKeyHex}`);
       blocklist = savedBlocklist ? new Set(JSON.parse(savedBlocklist)) : new Set;
       let savedRelayBlock = localStorage.getItem(`dage_relay_block_${pubKeyHex}`);
-      localRelayBlocklist = savedRelayBlock ? new Set(JSON.parse(savedRelayBlock)) : new Set,
+      localRelayBlocklist = savedRelayBlock ? new Set(JSON.parse(savedRelayBlock).map(u => "string" == typeof u ? u.replace(/\/+$/, "") : u)) : new Set,
         renderContacts(), initRelayConnection(), setTimeout(() => {
           isCloudSyncing = !1;
         }, 5e3);
@@ -10072,7 +10072,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     function initRelayConnection() {
       let savedUrls = localStorage.getItem(`dage_relay_${pubKeyHex}`);
-      savedUrls && (currentRelayUrls = savedUrls.split(",").map(u => u.trim()).filter(u => u.startsWith("ws"))),
+      savedUrls && (currentRelayUrls = [...new Set(savedUrls.split(",").map(u => u.trim().replace(/\/+$/, "")).filter(u => u.startsWith("ws")))]),
         0 === currentRelayUrls.length && (currentRelayUrls = ["wss://chat.boom.money"]),
         currentRelayUrls.forEach(url => {
           relayStates[url] || (relayStates[url] = {
@@ -10228,7 +10228,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       1 === urls.length ? dup > 0 ? alert("该节点已存在") : invalid > 0 && alert("节点地址必须以 ws:// 或 wss:// 开头") : alert(`批量处理完成：\n✅ 成功添加: ${added} 个\n⚠️ 重复忽略: ${dup} 个\n❌ 格式无效: ${invalid} 个`);
     }
 
-    function removeRelayNode(url) {
+    function removeRelayNode(rawUrl) {
+      let url = rawUrl.replace(/\/+$/, "");
       if (confirm(`确定要移除并屏蔽节点 ${url} 吗？\n(仅在此设备生效，云端同步时将自动忽略该节点)`)) {
         if (currentRelayUrls = currentRelayUrls.filter(u => u !== url), pubKeyHex && (localRelayBlocklist.add(url),
             localStorage.setItem(`dage_relay_block_${pubKeyHex}`, JSON.stringify(Array.from(localRelayBlocklist)))),
@@ -10246,7 +10247,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       }
     }
 
-    function restoreRelayNode(url) {
+    function restoreRelayNode(rawUrl) {
+      let url = rawUrl.replace(/\/+$/, "");
       localRelayBlocklist.delete(url), localStorage.setItem(`dage_relay_block_${pubKeyHex}`, JSON.stringify(Array.from(localRelayBlocklist))),
         currentRelayUrls.includes(url) || (currentRelayUrls.push(url), localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
           initRelayConnection()), renderRelayManagerList();
