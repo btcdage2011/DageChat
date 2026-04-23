@@ -10411,7 +10411,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                   if (data._dage_ext && (data._dage_ext.deleted_contacts && data._dage_ext.deleted_contacts.forEach(pk => deletedContacts.add(pk)),
                       data._dage_ext.deleted_groups && data._dage_ext.deleted_groups.forEach(gid => deletedGroups.add(gid)),
                       data._dage_ext.hidden_msgs && data._dage_ext.hidden_msgs.forEach(mid => hiddenMsgsSet.add(mid)),
-                      data._dage_ext.ghost_alias && (profiles[pubKeyHex] || (profiles[pubKeyHex] = {}),
+                      void 0 !== data._dage_ext.ghost_alias && (profiles[pubKeyHex] || (profiles[pubKeyHex] = {}),
                         profiles[pubKeyHex].ghostAlias = data._dage_ext.ghost_alias), data._dage_ext.cleared_ts)) {
                     let hasPurged = !1;
                     for (let pk in data._dage_ext.cleared_ts) {
@@ -10447,6 +10447,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                     }), currentRelayUrls.length !== oldRelayCount && (localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
                       initRelayConnection());
                   }
+                  syncLocalEncryptedCache();
                 }
               } catch (e) {
                 console.error("Kind 3 Decrypt Error:", e);
