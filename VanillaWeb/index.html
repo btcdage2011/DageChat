@@ -10459,8 +10459,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                   }
                   if (data.relays && Array.isArray(data.relays)) {
                     let oldRelayCount = currentRelayUrls.length;
-                    data.relays.forEach(url => {
-                      !url.startsWith("ws") || currentRelayUrls.includes(url) || localRelayBlocklist.has(url) || currentRelayUrls.push(url);
+                    data.relays.forEach(rawUrl => {
+                      if (!rawUrl.startsWith("ws")) return;
+                      let normUrl = rawUrl.replace(/\/+$/, ""),
+                        existsActive = currentRelayUrls.some(u => u.replace(/\/+$/, "") === normUrl),
+                        existsBlocked = Array.from(localRelayBlocklist).some(u => u.replace(/\/+$/, "") === normUrl);
+                      existsActive || existsBlocked || currentRelayUrls.push(normUrl);
                     }), currentRelayUrls.length !== oldRelayCount && (localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
                       initRelayConnection());
                   }
