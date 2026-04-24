@@ -10924,8 +10924,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let msg = `对方公开了 ${validCount} 个节点。\n\n`;
       dup > 0 && (msg += `- 已在活跃列表中：${dup} 个\n`), blocked > 0 && (msg += `- 位于本地黑名单：${blocked} 个 (导入将解除屏蔽)\n`),
         msg += `\n本次实际可新增并连接 ${toAdd + blocked} 个节点。\n\n确定要一键导入吗？`, confirm(msg) && (closePeerProfileModal(),
-          openRelayManager(), document.getElementById("new-relay-input").value = urls.join("\n"),
-          addRelayNode());
+          setTimeout(() => {
+            openRelayManager(), document.getElementById("new-relay-input").value = urls.join(","),
+              addRelayNode();
+          }, 300));
     }
 
     async function execSilentForward(targetPk, payloadStr) {
