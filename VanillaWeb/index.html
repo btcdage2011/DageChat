@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.80</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.81</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8940,7 +8940,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     const OFFICIAL_GROUP = {
       id: "feb75fb664b41f95",
       key: "0f01f4613e3f194bdcf5a0863e46bde7297df2304865ec2df9e48ade53ae6dbc",
-      name: "DageChat 测试频道",
+      name: "🌎 全球公开大厅 (公共测试)",
       owner: "f76e2a9bb1bb2cc65ef572382102d309c3efd2641081888a91e029138e8044de",
       type: 0
     };
@@ -9348,10 +9348,40 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function linkifyAndRenderMedia(txt, isMe) {
-      return escapeHTML(txt).replace(/(https?:\/\/[^\s]+)/g, url => {
-        if (url.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/)) return `<div class="mt-2 mb-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 text-center cursor-pointer shadow-sm" data-safe-url="${encodeURI(url.replace(/&quot;|&#39;|&lt;|&gt;/g, ""))}" onclick="let img = document.createElement('img'); img.src = this.getAttribute('data-safe-url'); img.className = 'max-w-full max-h-48 rounded-lg object-contain'; this.innerHTML = ''; this.appendChild(img); this.onclick = null;">\n                        <span class="text-blue-500 text-xs font-bold">🖼️ 点击加载外部图片 (注意: 加载将向对方服务器暴露您的 IP)</span>\n                    </div>`;
-        let safeUrl = encodeURI(url.replace(/&quot;|&#39;|&lt;|&gt;/g, "")),
-          displayUrl = escapeHTML(url.replace(/&quot;|&#39;|&lt;|&gt;/g, ""));
+      return escapeHTML(txt).replace(/((?:https?:\/\/|dage:\/\/invite\/)[^\s]+)/gi, url => {
+        let cleanUrl = url.replace(/&quot;|&#39;|&lt;|&gt;/g, "");
+        if (cleanUrl.toLowerCase().startsWith("dage://invite/")) {
+          let isGhost = cleanUrl.toLowerCase().includes("/ghost/"),
+            groupName = "加密群聊";
+          try {
+            let parts = cleanUrl.replace("dage://invite/", "").split("/"),
+              gTypeStr = parts[0],
+              b64Payload = parts[1],
+              rawDataStr = "";
+            if ("ghost" === gTypeStr) {
+              let payloadBytes = urlSafeBase64ToBytes(b64Payload);
+              if (payloadBytes.length >= 24 && window._GHOST_INVITE_KEY) {
+                let nonce = payloadBytes.subarray(0, 24),
+                  ciphertext = payloadBytes.subarray(24),
+                  decrypted = sodium.crypto_secretbox_open_easy(ciphertext, nonce, window._GHOST_INVITE_KEY);
+                rawDataStr = (new TextDecoder).decode(decrypted);
+              }
+            } else "normal" === gTypeStr && (rawDataStr = (new TextDecoder).decode(urlSafeBase64ToBytes(b64Payload)));
+            if (rawDataStr) {
+              let dataParts = rawDataStr.split("|");
+              dataParts.length >= 6 && (groupName = (new TextDecoder).decode(urlSafeBase64ToBytes(dataParts[3])));
+            }
+          } catch (e) {}
+          let textColor = isGhost ? isMe ? "text-purple-100" : "text-purple-700 dark:text-purple-300" : isMe ? "text-white" : "text-green-700 dark:text-green-300",
+            subTextColor = isGhost ? isMe ? "text-purple-200/80" : "text-purple-500 dark:text-purple-400" : isMe ? "text-white/80" : "text-green-500 dark:text-green-400",
+            iconBox = isGhost ? "bg-gradient-to-br from-purple-400 to-indigo-500" : "bg-gradient-to-br from-green-400 to-emerald-600",
+            icon = isGhost ? "🎭" : "🛡️",
+            typeLabel = isGhost ? "共享密钥群" : "端到端加密群";
+          return `<div class="mt-2 mb-1 border rounded-xl p-3 cursor-pointer shadow-sm transition-colors active:scale-95 flex items-center space-x-3 select-none ${isGhost ? isMe ? "bg-purple-500/20 border-purple-300 hover:bg-purple-500/30" : "bg-purple-50 border-purple-200 hover:bg-purple-100 dark:bg-purple-900/30 dark:border-purple-800/50 dark:hover:bg-purple-900/50" : isMe ? "bg-white/20 border-white/30 hover:bg-white/30" : "bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800/50 dark:hover:bg-green-900/50"}" data-invite="${escapeHTML(cleanUrl)}" onclick="joinGroup(this.getAttribute('data-invite'))">\n                        <div class="w-10 h-10 rounded-full ${iconBox} flex items-center justify-center text-white text-lg shrink-0 shadow-inner">${icon}</div>\n                        <div class="flex-1 min-w-0">\n                            <div class="font-bold text-[14px] truncate ${textColor}">${escapeHTML(groupName)}</div>\n                            <div class="text-[11px] mt-0.5 truncate ${subTextColor}">🎫 ${typeLabel} • 点击加入</div>\n                        </div>\n                    </div>`;
+        }
+        if (cleanUrl.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/)) return `<div class="mt-2 mb-1 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800 text-center cursor-pointer shadow-sm" data-safe-url="${encodeURI(cleanUrl)}" onclick="let img = document.createElement('img'); img.src = this.getAttribute('data-safe-url'); img.className = 'max-w-full max-h-48 rounded-lg object-contain'; this.innerHTML = ''; this.appendChild(img); this.onclick = null;">\n                        <span class="text-blue-500 text-xs font-bold">🖼️ 点击加载外部图片 (注意: 加载将向对方服务器暴露您的 IP)</span>\n                    </div>`;
+        let safeUrl = encodeURI(cleanUrl),
+          displayUrl = escapeHTML(cleanUrl);
         return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="${isMe ? "text-blue-200 hover:text-white" : "text-blue-500 hover:text-blue-700"} underline break-all">${displayUrl}</a>`;
       });
     }
@@ -9917,7 +9947,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         await saveEncryptedData("profiles_cache", lightProfiles);
         let hasLegacyBigCache = !1;
         for (let pk in messages) {
-          messages[pk] && messages[pk].length > 2e3 && (messages[pk] = messages[pk].slice(-2e3));
+          pk === OFFICIAL_GROUP.id && messages[pk] && messages[pk].length > 50 && (messages[pk] = messages[pk].slice(-50)),
+            messages[pk] && messages[pk].length > 2e3 && (messages[pk] = messages[pk].slice(-2e3));
           let currentSnap = JSON.stringify(messages[pk] || []);
           window._msgSnapshots[pk] !== currentSnap && (await saveEncryptedData("msg_" + pk, messages[pk] || []),
             window._msgSnapshots[pk] = currentSnap, hasLegacyBigCache = !0, await new Promise(r => setTimeout(r, 0)));
@@ -10323,7 +10354,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }), window.onload = async () => {
       if (!window.NostrTools) return alert("nostr.bundle.js 未找到");
       if (nt = window.NostrTools, !window.sodium) return alert("sodium.js 未找到");
-      await sodium.ready, localStorage.getItem("dage_sk") && (localStorage.removeItem("dage_sk"),
+      await sodium.ready;
+      const keyHash = await crypto.subtle.digest("SHA-256", (new TextEncoder).encode("dagechat"));
+      window._GHOST_INVITE_KEY = new Uint8Array(keyHash), localStorage.getItem("dage_sk") && (localStorage.removeItem("dage_sk"),
         alert("系统已升级军事级本地加密，请重新导入私钥并设置本地密码！"));
       let sessionPub = sessionStorage.getItem("dage_session_pub"),
         sessionPriv = sessionStorage.getItem("dage_session_priv");
@@ -10630,7 +10663,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               isAtMe: isAtMe
             }), messages[peerPk].sort(function(a, b) {
               return a.time - b.time;
-            }), peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
+            }), peerPk === OFFICIAL_GROUP.id && messages[peerPk].length > 50 && (messages[peerPk] = messages[peerPk].slice(-50)),
+            peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
             hiddenChats.has(peerPk) && hiddenChats.delete(peerPk), profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
               kinds: [0],
               authors: [senderPk]
@@ -11308,6 +11342,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       } else picUrl ? (avatarBox.innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`,
         avatarBox.classList.replace("bg-gray-400", "bg-transparent")) : (avatarBox.innerText = prof.name ? String(prof.name).substring(0, 1) : "?",
         avatarBox.classList.replace("bg-transparent", "bg-gray-400"));
+      let banner = document.getElementById("public-lobby-banner");
+      currentChatPk === OFFICIAL_GROUP.id ? (banner || (banner = document.createElement("div"),
+          banner.id = "public-lobby-banner", banner.className = "bg-red-50 dark:bg-red-900/40 border-b border-red-200 dark:border-red-800 p-2 text-center text-[11px] md:text-xs text-red-600 dark:text-red-400 font-bold flex-shrink-0 z-10 shadow-sm leading-relaxed",
+          banner.innerHTML = "⚠️ 警告：本大厅为开源公共测试区，所有成员共享密钥，发言对全网公开。请绝不要在此发送隐私信息！系统仅保留最近 50 条消息。",
+          document.getElementById("chat-header").insertAdjacentElement("afterend", banner)),
+        banner.style.display = "block") : banner && (banner.style.display = "none");
     }
 
     let globalTargetMsgIdToHighlight = null;
@@ -12326,6 +12366,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           groupName = (new TextDecoder).decode(urlSafeBase64ToBytes(safeName));
         } catch (e) {}
         if (groups[gid]) return alert(`您已在群组【${groupName}】中！`), void selectContact(gid);
+        let confirmMsg = `🎫 发现群组邀请\n\n群名称：${groupName}\n群类型：${1 === gType ? "⚡ 共享密钥 (幽灵群)" : "🛡️ 端到端加密群"}\n\n确定要加入该群聊吗？`;
+        if (!confirm(confirmMsg)) return;
         groups[gid] = {
             name: groupName,
             key_hex: keyHex,
