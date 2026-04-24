@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.83</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.84</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8114,6 +8114,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       <div id="chat-input-area" class="p-3 md:p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 hidden z-10 shrink-0 pb-safe relative">
 
 
+        <div id="float-unread-btn" onclick="scrollToBottomManually()" class="hidden absolute -top-12 right-4 z-50 bg-blue-500 hover:bg-blue-600 text-white text-[12px] font-bold px-3 py-1.5 rounded-full shadow-lg cursor-pointer transition flex items-center shadow-blue-500/30 active:scale-95">
+          <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+          </svg>
+          底部有新消息
+        </div>
 
         <div id="reply-preview-area" class="hidden mb-2 px-3 py-2 bg-gray-100 dark:bg-gray-950 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-between">
           <div class="flex flex-col overflow-hidden border-l-2 border-blue-500 pl-2">
@@ -10400,13 +10406,36 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     };
 
     let batchUpdateTimer = null,
-      batchNeedsScroll = !1;
+      batchNeedsScroll = !1,
+      batchHasNewUnread = !1;
+
+    function showUnreadFloatButton() {
+      let btn = document.getElementById("float-unread-btn");
+      btn && btn.classList.remove("hidden");
+    }
+
+    function hideUnreadFloatButton() {
+      let btn = document.getElementById("float-unread-btn");
+      btn && btn.classList.add("hidden");
+    }
+
+    function scrollToBottomManually() {
+      let list = document.getElementById("message-list");
+      list && list.scrollTo({
+        top: list.scrollHeight,
+        behavior: "smooth"
+      }), hideUnreadFloatButton();
+    }
 
     function triggerBatchUpdate(needScroll = !1) {
-      needScroll && (batchNeedsScroll = !0), batchUpdateTimer && clearTimeout(batchUpdateTimer),
+      let list = document.getElementById("message-list"),
+        isAtBottom = !1;
+      list && needScroll && (isAtBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 150),
+        needScroll && (isAtBottom ? batchNeedsScroll = !0 : batchHasNewUnread = !0), batchUpdateTimer && clearTimeout(batchUpdateTimer),
         batchUpdateTimer = setTimeout(() => {
-          syncLocalEncryptedCache(), renderContacts(), currentChatPk && renderMessages(batchNeedsScroll),
-            batchNeedsScroll = !1, batchUpdateTimer = null;
+          syncLocalEncryptedCache(), renderContacts(), currentChatPk && (renderMessages(batchNeedsScroll),
+              !batchHasNewUnread || batchNeedsScroll || void 0 === isSelectMode || isSelectMode || showUnreadFloatButton()),
+            batchNeedsScroll = !1, batchHasNewUnread = !1, batchUpdateTimer = null;
         }, 250);
     }
 
@@ -10801,6 +10830,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       replyTargetId = null, document.getElementById("reply-preview-area").classList.add("hidden"),
         document.getElementById("reply-preview-text").innerText = "";
     }
+
+    document.getElementById("message-list").addEventListener("scroll", function() {
+      if (!currentChatPk) return;
+      this.scrollHeight - this.scrollTop - this.clientHeight < 50 && hideUnreadFloatButton();
+    });
 
     let forwardMode = "merge",
       selectedForwardTargets = new Set;
@@ -11300,7 +11334,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           titleBlinkTimer = null, document.title = originalTitle);
       let mentionBtn = document.getElementById("btn-mention");
       mentionBtn && (groups[pk] ? mentionBtn.classList.remove("hidden") : mentionBtn.classList.add("hidden")),
-        exitSelectMode(), renderContacts(), updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
+        "function" == typeof hideUnreadFloatButton && hideUnreadFloatButton(), exitSelectMode(),
+        renderContacts(), updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
         document.getElementById("welcome-area").classList.add("hidden"), document.getElementById("chat-header").classList.remove("hidden"),
         document.getElementById("message-list").classList.remove("hidden"), document.getElementById("chat-input-area").classList.remove("hidden"),
         document.getElementById("chat-area").classList.remove("translate-x-full"), renderMessages(!0),
@@ -11430,7 +11465,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             contentHtml = `\n                  <div class="border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg p-2.5 cursor-pointer active:bg-gray-200 transition shadow-sm w-60" data-payload="${encodeURIComponent(m.text)}" onclick="openHistoryViewer(this.getAttribute('data-payload'))">\n                      <div class="font-bold text-[13px] text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-1 mb-1.5 truncate">${escapeHTML(title)}</div>\n                      ${previews}\n                      <div class="text-[10px] text-gray-400 mt-2 border-t border-gray-100 dark:border-gray-800 pt-1 text-center">点击查看全文</div>\n                  </div>`;
           } else if (contentHtml = linkifyAndRenderMedia(parsed.text || "", isMe), parsed.imageB64) {
             let imgBorder = isMe ? "border-blue-400" : "border-gray-200 dark:border-gray-700",
-              imgHtml = `<img src="data:image/jpeg;base64,${parsed.imageB64}" class="max-w-full max-h-48 rounded-lg object-contain shadow-sm border ${imgBorder} cursor-zoom-in" onclick="openImageViewer(this.src)" onload="if(this.parentNode.parentNode.parentNode.parentNode === document.getElementById('message-list')) document.getElementById('message-list').scrollTop = document.getElementById('message-list').scrollHeight">`;
+              imgHtml = `<img src="data:image/jpeg;base64,${parsed.imageB64}" class="max-w-full max-h-48 rounded-lg object-contain shadow-sm border ${imgBorder} cursor-zoom-in" onclick="openImageViewer(this.src)" onload="let list = document.getElementById('message-list'); if(this.parentNode.parentNode.parentNode.parentNode === list) { if (list.scrollHeight - list.scrollTop - list.clientHeight < 250) { list.scrollTop = list.scrollHeight; } }">`;
             contentHtml += contentHtml ? `<div class="mt-2 mb-1">${imgHtml}</div>` : `<div class="mb-1">${imgHtml}</div>`;
           }
           let senderNameHtml = "",
