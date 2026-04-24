@@ -7934,7 +7934,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DageChat 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.81</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.83</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8200,16 +8200,18 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           <label id="peer-modal-pubkey-label" class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Npub 公钥</label>
           <div class="flex items-center">
             <div id="peer-modal-pubkey" class="text-xs text-gray-600 dark:text-gray-300 font-mono truncate flex-1 select-all"></div>
-            <button onclick="showQrCode('公钥二维码', document.getElementById('peer-modal-pubkey').innerText, document.getElementById('peer-modal-name').innerText)" class="ml-2 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="显示二维码">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
-              </svg>
-            </button>
-            <button onclick="copyText(document.getElementById('peer-modal-pubkey').innerText); alert('ID 已复制！')" class="ml-1 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="复制公钥">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-              </svg>
-            </button>
+            <div id="peer-modal-pubkey-actions" class="flex items-center shrink-0">
+              <button onclick="showQrCode('公钥二维码', document.getElementById('peer-modal-pubkey').innerText, document.getElementById('peer-modal-name').innerText)" class="ml-2 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="显示二维码">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                </svg>
+              </button>
+              <button onclick="copyText(document.getElementById('peer-modal-pubkey').innerText); alert('ID 已复制！')" class="ml-1 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="复制公钥">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -8318,6 +8320,9 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 text-sm border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
               <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value, document.getElementById('edit-name').value || '我')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg text-lg border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">📱</button>
             </div>
+            <button onclick="let url = window.location.origin + window.location.pathname + '#contact=' + document.getElementById('my-npub-display').value; copyText(url); alert('✅ 专属链接已复制！\n\n您可以将此链接挂在个人主页或发到微信群，任何人点击即可一键拉起 DageChat 并在浏览器向您打招呼。');" class="mt-2 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 py-2.5 rounded-lg text-xs font-bold transition border border-indigo-200 dark:border-indigo-800 shadow-sm flex items-center justify-center active:scale-95">
+              🔗 复制「联系我」专属网页链接 (一键拉起聊天)
+            </button>
           </div>
 
           <div>
@@ -8570,7 +8575,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           <span class="ml-2 block text-sm text-gray-800 dark:text-gray-100 font-medium">创建为共享密钥群 (幽灵群 ⚡)</span>
         </div>
         <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-          * <b>普通群 📢</b>：群主可管理，所有客户端可见。<br>
+          * <b>普通群 🛡️</b>：群主可管理，所有客户端可见。<br>
           * <b>共享密钥群 ⚡</b>：极其匿名，群成员共用一把私钥收发信，无法追踪真实身份。
         </p>
       </div>
@@ -8587,7 +8592,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-2">群组邀请码</h3>
       <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">复制下方邀请码发送给好友，对方在添加栏粘贴即可加入。</p>
       <textarea id="invite-code-display" readonly rows="5" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-lg p-3 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 focus:outline-none resize-none break-all"></textarea>
-      <div class="mt-5 flex justify-end space-x-3">
+      <button onclick="let url = window.location.origin + window.location.pathname + '#invite=' + document.getElementById('invite-code-display').value; copyText(url); alert('✅ 网页邀请链接已复制！\n\n好友点击该链接，即可在浏览器中一键拉起并确认加群。'); closeInviteCodeModal();" class="mt-4 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 py-3 rounded-lg text-sm font-bold transition border border-indigo-200 dark:border-indigo-800 shadow-sm flex items-center justify-center active:scale-95">
+        🔗 复制网页邀请链接 (推荐)
+      </button>
+      <div class="mt-4 flex justify-end space-x-3">
         <button onclick="closeInviteCodeModal()" class="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-950 rounded-lg transition">关闭</button>
         <button onclick="showQrCode('群组邀请码', document.getElementById('invite-code-display').value, document.getElementById('invite-code-display').getAttribute('data-gname') || '群聊')" class="px-4 py-2.5 text-xl font-medium bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition shadow-sm active:scale-95" title="显示二维码">📱</button>
         <button onclick="copyText(document.getElementById('invite-code-display').value); alert('邀请码已复制！'); closeInviteCodeModal();" class="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95">复制邀请码</button>
@@ -8936,14 +8944,6 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     window.addEventListener("popstate", e => ModalManager.handlePopState(e));
-
-    const OFFICIAL_GROUP = {
-      id: "feb75fb664b41f95",
-      key: "0f01f4613e3f194bdcf5a0863e46bde7297df2304865ec2df9e48ade53ae6dbc",
-      name: "🌎 全球公开大厅 (公共测试)",
-      owner: "f76e2a9bb1bb2cc65ef572382102d309c3efd2641081888a91e029138e8044de",
-      type: 0
-    };
 
     let outboxQueue = [],
       isSendingQueue = !1;
@@ -9947,8 +9947,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         await saveEncryptedData("profiles_cache", lightProfiles);
         let hasLegacyBigCache = !1;
         for (let pk in messages) {
-          pk === OFFICIAL_GROUP.id && messages[pk] && messages[pk].length > 50 && (messages[pk] = messages[pk].slice(-50)),
-            messages[pk] && messages[pk].length > 2e3 && (messages[pk] = messages[pk].slice(-2e3));
+          messages[pk] && messages[pk].length > 2e3 && (messages[pk] = messages[pk].slice(-2e3));
           let currentSnap = JSON.stringify(messages[pk] || []);
           window._msgSnapshots[pk] !== currentSnap && (await saveEncryptedData("msg_" + pk, messages[pk] || []),
             window._msgSnapshots[pk] = currentSnap, hasLegacyBigCache = !0, await new Promise(r => setTimeout(r, 0)));
@@ -10093,12 +10092,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let picUrl = formatAvatarUrl(myProf.picture);
         picUrl && (document.getElementById("my-avatar").innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`);
       }
-      "1" === localStorage.getItem(`dage_exited_official_${pubKeyHex}`) || groups[OFFICIAL_GROUP.id] || (groups[OFFICIAL_GROUP.id] = {
-        name: OFFICIAL_GROUP.name,
-        key_hex: OFFICIAL_GROUP.key,
-        type: OFFICIAL_GROUP.type,
-        owner: OFFICIAL_GROUP.owner
-      }, syncLocalEncryptedCache());
+      groups.feb75fb664b41f95 && (delete groups.feb75fb664b41f95, deletedGroups.add("feb75fb664b41f95"),
+        syncLocalEncryptedCache());
       let savedBlocklist = localStorage.getItem(`dage_blocklist_${pubKeyHex}`);
       blocklist = savedBlocklist ? new Set(JSON.parse(savedBlocklist)) : new Set;
       let savedRelayBlock = localStorage.getItem(`dage_relay_block_${pubKeyHex}`);
@@ -10106,6 +10101,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         renderContacts(), initRelayConnection(), setTimeout(() => {
           isCloudSyncing = !1;
         }, 5e3);
+      let pendingContact = sessionStorage.getItem("dage_pending_contact");
+      pendingContact && (sessionStorage.removeItem("dage_pending_contact"), setTimeout(() => {
+        pendingContact === pubKeyHex || contacts.includes(pendingContact) || groups[pendingContact] ? selectContact(pendingContact) : showPeerProfileModal(pendingContact);
+      }, 600));
+      let pendingInvite = sessionStorage.getItem("dage_pending_invite");
+      pendingInvite && (sessionStorage.removeItem("dage_pending_invite"), setTimeout(() => {
+        joinGroup(pendingInvite);
+      }, 600));
     }
 
     function initRelayConnection() {
@@ -10663,8 +10666,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               isAtMe: isAtMe
             }), messages[peerPk].sort(function(a, b) {
               return a.time - b.time;
-            }), peerPk === OFFICIAL_GROUP.id && messages[peerPk].length > 50 && (messages[peerPk] = messages[peerPk].slice(-50)),
-            peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
+            }), peerPk === currentChatPk ? lastReadWatermarks[peerPk] = Math.max(lastReadWatermarks[peerPk] || 0, timestamp, Math.floor(Date.now() / 1e3)) : isNewRealTimeMsg && senderPk !== pubKeyHex && (unreadCounts[peerPk] = (unreadCounts[peerPk] || 0) + 1),
             hiddenChats.has(peerPk) && hiddenChats.delete(peerPk), profiles[senderPk] || senderPk === pubKeyHex || broadcastToRelays(JSON.stringify(["REQ", "fetchNewUser-" + Date.now(), {
               kinds: [0],
               authors: [senderPk]
@@ -10818,8 +10820,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let prof = isGroup ? groups[pk] : profiles[pk] || {
             name: fallbackName
           },
-          name = String(prof.name || fallbackName),
-          isOfficial = pk === OFFICIAL_GROUP.id;
+          name = String(prof.name || fallbackName);
         if (pk === pubKeyHex && (name = `${profiles[pubKeyHex]?.name || "我"} (备忘录 💾)`,
             prof = profiles[pubKeyHex] || {
               name: "我"
@@ -10852,8 +10853,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         if (isGroup) {
           let icon = "🛡️",
             bgColor = "bg-green-500";
-          1 === prof.type ? (name = `[共享群] ${name}`, icon = "⚡", bgColor = "bg-purple-500") : isOfficial ? (name = `[测试频道] ${name}`,
-            icon = "📢") : name = `[加密群] ${name}`, avatarHtml = `<div class="w-10 h-10 rounded-full ${bgColor} text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${icon}</div>`;
+          1 === prof.type ? (name = `[共享群] ${name}`, icon = "⚡", bgColor = "bg-purple-500") : name = `[加密群] ${name}`,
+            avatarHtml = `<div class="w-10 h-10 rounded-full ${bgColor} text-white flex items-center justify-center font-bold shrink-0 shadow-sm text-lg">${icon}</div>`;
         } else {
           let picUrl = formatAvatarUrl(prof.picture);
           avatarHtml = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shrink-0 shadow-sm">` : `<div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">${escapeHTML(name ? String(name).substring(0, 1) : "?")}</div>`;
@@ -11006,7 +11007,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             finalPayload = new Uint8Array(25 + ciphertext.length);
           finalPayload[0] = 2, finalPayload.set(nonceBytes, 1), finalPayload.set(ciphertext, 25);
           let b64Content = bytesToBase64(finalPayload),
-            difficulty = "feb75fb664b41f95" === targetPk ? 16 : 8,
+            difficulty = 8,
             event = await minePowAndSign(privKeyHex, 42, b64Content, [
               ["g", targetPk]
             ], difficulty),
@@ -11208,9 +11209,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             name: fallbackName
           },
           isStranger = !isGroup && !contacts.includes(pk) && pk !== pubKeyHex,
-          isOfficial = pk === OFFICIAL_GROUP.id,
           displayName = prof.name;
-        if (pk === pubKeyHex ? displayName = `${prof.name || "我"} (备忘录 💾)` : isGroup && 1 === prof.type ? displayName = `[共享群] ${prof.name}` : isGroup && isOfficial ? displayName = `[测试频道] ${prof.name}` : isGroup && (displayName = `[加密群] ${prof.name}`),
+        if (pk === pubKeyHex ? displayName = `${prof.name || "我"} (备忘录 💾)` : isGroup && 1 === prof.type ? displayName = `[共享群] ${prof.name}` : isGroup && (displayName = `[加密群] ${prof.name}`),
           filterText) {
           let safeName = String(displayName || "").toLowerCase(),
             safePk = String(pk || "").toLowerCase();
@@ -11220,13 +11220,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           lastMsgTime = msgs.length > 0 ? msgs[msgs.length - 1].time : 0,
           unread = unreadCounts[pk] || 0;
         if ("chats" === currentSidebarTab) {
-          if (0 === msgs.length && 0 === unread && pk !== currentChatPk && pk !== pubKeyHex && !isOfficial) return;
+          if (0 === msgs.length && 0 === unread && pk !== currentChatPk && pk !== pubKeyHex) return;
           if (hiddenChats.has(pk) && 0 === unread && pk !== currentChatPk) return;
         } else if (isStranger) return;
         renderList.push({
           pk: pk,
           isGroup: isGroup,
-          isOfficial: isOfficial,
           prof: prof,
           displayName: displayName,
           isStranger: isStranger,
@@ -11243,8 +11242,6 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       }) : renderList.sort((a, b) => {
         if (a.pk === pubKeyHex) return -1;
         if (b.pk === pubKeyHex) return 1;
-        if (a.isOfficial) return -1;
-        if (b.isOfficial) return 1;
         let aIsGhost = a.isGroup && 1 === a.prof.type,
           bIsGhost = b.isGroup && 1 === b.prof.type;
         return aIsGhost && !bIsGhost ? -1 : !aIsGhost && bIsGhost ? 1 : a.isGroup && !b.isGroup ? -1 : !a.isGroup && b.isGroup ? 1 : (a.prof.name || "").localeCompare(b.prof.name || "", "zh");
@@ -11252,7 +11249,6 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let {
           pk: pk,
           isGroup: isGroup,
-          isOfficial: isOfficial,
           prof: prof,
           displayName: displayName,
           isStranger: isStranger,
@@ -11264,7 +11260,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         let unreadBadge = unread > 0 ? `<div class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-[20px] flex items-center justify-center rounded-full border-2 border-white dark:border-gray-900 shadow-sm px-1">${unread > 99 ? "99+" : unread}</div>` : "",
           picUrl = isGroup ? "" : formatAvatarUrl(prof.picture),
           avatarInner = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-white font-bold">${prof.name ? String(prof.name).substring(0, 1) : "?"}</div>`;
-        isGroup && 1 === prof.type ? avatarInner = '<div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">⚡</div>' : isGroup && 0 === prof.type && (avatarInner = `<div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">${isOfficial ? "📢" : "🛡️"}</div>`);
+        isGroup && 1 === prof.type ? avatarInner = '<div class="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">⚡</div>' : isGroup && 0 === prof.type && (avatarInner = '<div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold shadow-sm">🛡️</div>');
         let avatarHtml = `<div class="relative shrink-0">${avatarInner}${unreadBadge}</div>`,
           strangerBadge = isStranger ? '<span class="ml-1.5 px-1 py-0.5 bg-gray-200 text-gray-500 text-[9px] rounded whitespace-nowrap">陌生人</span>' : "",
           subTitleHtml = "";
@@ -11335,19 +11331,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let picUrl = isGroup ? "" : formatAvatarUrl(prof.picture),
         avatarBox = document.getElementById("chat-avatar");
       if (isGroup) {
-        let badgeIcon = 1 === prof.type ? "⚡" : currentChatPk === OFFICIAL_GROUP.id ? "📢" : "🛡️",
+        let badgeIcon = 1 === prof.type ? "⚡" : "🛡️",
           bgColor = 1 === prof.type ? "bg-purple-500" : "bg-green-500";
         avatarBox.innerHTML = `<div class="w-full h-full ${bgColor} rounded-full flex items-center justify-center text-white text-xl font-bold">${badgeIcon}</div>`,
           avatarBox.classList.replace("bg-gray-400", "bg-transparent");
       } else picUrl ? (avatarBox.innerHTML = `<img src="${picUrl}" class="w-full h-full object-cover">`,
         avatarBox.classList.replace("bg-gray-400", "bg-transparent")) : (avatarBox.innerText = prof.name ? String(prof.name).substring(0, 1) : "?",
         avatarBox.classList.replace("bg-transparent", "bg-gray-400"));
-      let banner = document.getElementById("public-lobby-banner");
-      currentChatPk === OFFICIAL_GROUP.id ? (banner || (banner = document.createElement("div"),
-          banner.id = "public-lobby-banner", banner.className = "bg-red-50 dark:bg-red-900/40 border-b border-red-200 dark:border-red-800 p-2 text-center text-[11px] md:text-xs text-red-600 dark:text-red-400 font-bold flex-shrink-0 z-10 shadow-sm leading-relaxed",
-          banner.innerHTML = "⚠️ 警告：本大厅为开源公共测试区，所有成员共享密钥，发言对全网公开。请绝不要在此发送隐私信息！系统仅保留最近 50 条消息。",
-          document.getElementById("chat-header").insertAdjacentElement("afterend", banner)),
-        banner.style.display = "block") : banner && (banner.style.display = "none");
     }
 
     let globalTargetMsgIdToHighlight = null;
@@ -11384,7 +11374,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let parsed = parseMessageContent(m.text),
             isMe = m.sender === pubKeyHex || parsed && parsed.nonce && myGhostNonces.has(parsed.nonce),
             isSelected = selectedMsgIds.has(m.id),
-            encIcon = 59 === m.enc_type ? "🎁" : 0 === m.enc_type ? "📢" : "🔒",
+            encIcon = 59 === m.enc_type ? "🎁" : 0 === m.enc_type ? "🛡️" : "🔒",
             statusIcon = "";
           if (isMe && void 0 !== m.status)
             if (0 === m.status) statusIcon = '<span class="ml-1 text-gray-300 animate-pulse" title="发送中">⏳</span>';
@@ -11573,7 +11563,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               closeSearchModal(), jumpToMessage(res.chatPk, res.msgId);
             };
           let icon = "👤";
-          res.isGroup && (icon = 1 === groups[res.chatPk].type ? "⚡" : "📢"), res.chatPk === OFFICIAL_GROUP.id && (icon = "📡");
+          res.isGroup && (icon = 1 === groups[res.chatPk].type ? "⚡" : "🛡️");
           let safeKeyword = escapeHTML(keyword).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"),
             highlightRegex = new RegExp(safeKeyword, "gi"),
             highlightSnippet = escapeHTML(snippet).replace(highlightRegex, function(match) {
@@ -11659,7 +11649,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                 ["g", currentChatPk]
               ];
             currentReplyId && tags.push(["e", currentReplyId, "", "reply"]);
-            let difficulty = "feb75fb664b41f95" === currentChatPk ? 16 : 8,
+            let difficulty = 8,
               event = await minePowAndSign(privKeyHex, 42, b64Content, tags, difficulty);
             messages[currentChatPk] || (messages[currentChatPk] = []);
             let msgObj = {
@@ -11765,7 +11755,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           },
           isStranger = !isGroup && !contacts.includes(targetPk) && targetPk !== pubKeyHex,
           displayName = prof.name,
-          displayId = isGroup ? "群组 ID / 公钥" : "Npub 公钥",
+          displayId = isGroup ? "群组 ID" : "Npub 公钥",
           displayPubkeyText = targetPk;
         targetPk === pubKeyHex ? (displayName = `${prof.name || "我"} (备忘录 💾)`, displayPubkeyText = nt.nip19.npubEncode(targetPk)) : isGroup || (displayPubkeyText = nt.nip19.npubEncode(targetPk)),
           document.getElementById("peer-modal-name").innerText = displayName || "未知", document.getElementById("peer-modal-pubkey-label").innerText = displayId,
@@ -11773,10 +11763,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             kinds: [0],
             authors: [targetPk]
           }]));
+        let pubkeyActionsEl = document.getElementById("peer-modal-pubkey-actions");
+        pubkeyActionsEl && (isGroup ? pubkeyActionsEl.classList.add("hidden") : pubkeyActionsEl.classList.remove("hidden"));
         let avatarBox = document.getElementById("peer-modal-avatar");
         if (avatarBox.classList.remove("bg-white", "dark:bg-gray-900", "dark:bg-gray-700", "bg-transparent"),
           isGroup) {
-          let badgeIcon = 1 === prof.type ? "⚡" : targetPk === OFFICIAL_GROUP.id ? "📢" : "🛡️",
+          let badgeIcon = 1 === prof.type ? "⚡" : "🛡️",
             bgColor = 1 === prof.type ? "bg-purple-500" : "bg-green-500";
           avatarBox.innerHTML = `<div class="w-full h-full ${bgColor} flex items-center justify-center text-white text-4xl font-bold shadow-inner">${badgeIcon}</div>`;
         } else if (prof.picture) {
@@ -11809,7 +11801,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         }
         let badge = document.getElementById("peer-modal-badge"),
           actionArea = document.getElementById("peer-action-btn-area");
-        if (isGroup) badge.classList.remove("hidden"), 1 === prof.type ? badge.innerText = "共享群组" : targetPk === OFFICIAL_GROUP.id ? badge.innerText = "测试公共频道" : badge.innerText = "加密群组",
+        if (isGroup) badge.classList.remove("hidden"), 1 === prof.type ? badge.innerText = "共享群组" : badge.innerText = "加密群组",
           badge.className = "px-2 py-0.5 text-[10px] rounded mb-4 font-medium bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400",
           actionArea.innerHTML = `\n                        <button onclick="generateInviteLink('${targetPk}')" class="w-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50 py-3 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition shadow-sm font-bold active:scale-95 text-sm flex items-center justify-center mb-3">🎫 生成/查看邀请码</button>\n                        <button onclick="exitGroupFromModal('${targetPk}')" class="w-full bg-white dark:bg-gray-900 text-red-50 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-gray-800 transition shadow-sm font-bold border border-red-200 dark:border-red-800 active:scale-95 text-sm flex items-center justify-center text-red-500">👋 退出群聊 (清除数据)</button>\n                    `;
         else if (targetPk === pubKeyHex) badge.classList.remove("hidden"),
@@ -11824,7 +11816,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           let blockBtn = blocklist.has(targetPk) ? `<button onclick="toggleBlockUser('${targetPk}', false)" class="w-full mt-3 bg-white dark:bg-gray-900 text-green-600 py-3 rounded-xl hover:bg-green-50 dark:hover:bg-gray-800 transition border border-green-200 dark:border-green-800 shadow-sm active:scale-95 text-sm font-bold">✅ 解除屏蔽</button>` : `<button onclick="toggleBlockUser('${targetPk}', true)" class="w-full mt-3 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition border border-gray-300 dark:border-gray-700 shadow-sm active:scale-95 text-sm font-bold">🚫 屏蔽此人</button>`;
           escapeHTML(displayName).replace(/'/g, "\\'"), actionArea.innerHTML = `\n                        <button onclick="closePeerProfileModal(); selectContact('${targetPk}'); switchSidebarTab('chats');" class="w-full bg-blue-600 text-white py-3 mb-3 rounded-xl hover:bg-blue-700 transition shadow font-bold active:scale-95 text-sm flex items-center justify-center">💬 发起私聊</button>\n                        <button onclick="removeContactFromModal('${targetPk}')" class="w-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 py-3 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/40 transition shadow-sm font-bold border border-red-200 dark:border-red-800 active:scale-95 text-sm flex items-center justify-center">彻底删除好友</button>\n                        ${blockBtn}\n                    `;
         }
-        document.getElementById("peer-profile-modal").classList.remove("hidden");
+        isGroup || targetPk === pubKeyHex || (actionArea.innerHTML += `\n                        <button onclick="let url = window.location.origin + window.location.pathname + '#contact=' + nt.nip19.npubEncode('${targetPk}'); copyText(url); alert('✅ 对方的名片链接已复制！\\n\\n可将此链接发送给其他人，点击即可在浏览器中一键打开此人资料并添加好友。');" class="w-full mt-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 py-3 rounded-xl text-sm font-bold transition border border-indigo-200 dark:border-indigo-800 shadow-sm flex items-center justify-center active:scale-95">🔗 复制 Ta 的名片链接 (分享给其他人)</button>\n                    `),
+          document.getElementById("peer-profile-modal").classList.remove("hidden");
         let contentBox = document.getElementById("peer-profile-content");
         contentBox && contentBox.lastElementChild && (contentBox.lastElementChild.scrollTop = 0),
           setTimeout(() => document.getElementById("peer-profile-content").classList.remove("scale-95"), 10),
@@ -11835,10 +11828,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     function exitGroupFromModal(gid) {
-      confirm(`确定要退出群聊【${groups[gid].name}】吗？\n退出后将清除本地数据，重新加入需要新的邀请码。`) && (gid === OFFICIAL_GROUP.id && localStorage.setItem(`dage_exited_official_${pubKeyHex}`, "1"),
-        delete groups[gid], messages[gid] = [], delete unreadCounts[gid], deletedGroups.add(gid),
-        savePrivacyStateImmediately(), syncLocalEncryptedCache(), triggerCloudSync(), renderContacts(),
-        closePeerProfileModal(), closeChat({
+      confirm(`确定要退出群聊【${groups[gid].name}】吗？\n退出后将清除本地数据，重新加入需要新的邀请码。`) && (delete groups[gid],
+        messages[gid] = [], delete unreadCounts[gid], deletedGroups.add(gid), savePrivacyStateImmediately(),
+        syncLocalEncryptedCache(), triggerCloudSync(), renderContacts(), closePeerProfileModal(),
+        closeChat({
           stopPropagation: () => {}
         }));
     }
@@ -12385,7 +12378,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             "#p": [gid],
             limit: 50
           }), broadcastToRelays(JSON.stringify(appendReq)), renderContacts(), selectContact(gid),
-          0 === gType && gid !== OFFICIAL_GROUP.id && setTimeout(async () => {
+          0 === gType && setTimeout(async () => {
             let inputEl = document.getElementById("msg-input");
             inputEl && (inputEl.value = "👋 我加入了群聊", await sendMessage());
           }, 500);
@@ -12652,7 +12645,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     function openChatMoreModal() {
       if (!currentChatPk) return;
       let profileBtn = document.getElementById("chat-more-profile-btn");
-      groups[currentChatPk] ? profileBtn.innerText = 1 === groups[currentChatPk].type ? "⚡ 查看共享群资料" : "📢 查看群资料" : profileBtn.innerText = "👤 查看联系人资料",
+      groups[currentChatPk] ? profileBtn.innerText = 1 === groups[currentChatPk].type ? "⚡ 查看共享群资料" : "🛡️ 查看群资料" : profileBtn.innerText = "👤 查看联系人资料",
         document.getElementById("chat-more-modal").classList.remove("hidden"), setTimeout(() => {
           document.getElementById("chat-more-content").classList.remove("translate-y-full");
         }, 10), ModalManager.push("chatMore", closeChatMoreModal);
@@ -12692,25 +12685,62 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         renderContacts(), closeSessionActionModal());
     }
 
+    function _extractContactIntent() {
+      let hash = window.location.hash;
+      if (hash && hash.startsWith("#contact=")) {
+        let val = hash.replace("#contact=", "").trim();
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        try {
+          let pk = val.startsWith("npub") ? nt.nip19.decode(val).data : val;
+          if (/^[0-9a-f]{64}$/i.test(pk)) return {
+            type: "contact",
+            data: pk
+          };
+        } catch (e) {
+          console.warn("Invalid contact hash");
+        }
+      } else if (hash && hash.startsWith("#invite=")) {
+        let val = hash.replace("#invite=", "").trim();
+        if (history.replaceState(null, "", window.location.pathname + window.location.search),
+          val.startsWith("dage://invite/")) return {
+          type: "invite",
+          data: val
+        };
+      }
+      return null;
+    }
+
+    function _processContactIntent() {
+      let intent = _extractContactIntent();
+      if (intent)
+        if (void 0 !== pubKeyHex && pubKeyHex && !isLocked)
+          if ("contact" === intent.type) {
+            let intentPk = intent.data;
+            intentPk === pubKeyHex || contacts.includes(intentPk) || groups[intentPk] ? selectContact(intentPk) : showPeerProfileModal(intentPk);
+          } else "invite" === intent.type && joinGroup(intent.data);
+      else sessionStorage.setItem("dage_pending_" + intent.type, intent.data);
+    }
+
     contactsListEl.addEventListener("touchstart", e => {
-      0 === contactsListEl.scrollTop && (pStart.y = e.touches[0].clientY, pIsPulling = !0,
-        contactsListEl.classList.remove("pull-to-refresh"));
-    }, {
-      passive: !0
-    }), contactsListEl.addEventListener("touchmove", e => {
-      if (!pIsPulling) return;
-      pCurrent.y = e.touches[0].clientY;
-      let dy = pCurrent.y - pStart.y;
-      dy > 0 && 0 === contactsListEl.scrollTop && (contactsListEl.style.transform = `translateY(${Math.min(dy / 2, 80)}px)`);
-    }, {
-      passive: !0
-    }), contactsListEl.addEventListener("touchend", e => {
-      if (!pIsPulling) return;
-      pIsPulling = !1;
-      let dy = pCurrent.y - pStart.y;
-      contactsListEl.classList.add("pull-to-refresh"), contactsListEl.style.transform = "",
-        dy > 120 && 0 === contactsListEl.scrollTop && softReloadNetwork();
-    }), window.addEventListener("DOMContentLoaded", initTheme);
+        0 === contactsListEl.scrollTop && (pStart.y = e.touches[0].clientY, pIsPulling = !0,
+          contactsListEl.classList.remove("pull-to-refresh"));
+      }, {
+        passive: !0
+      }), contactsListEl.addEventListener("touchmove", e => {
+        if (!pIsPulling) return;
+        pCurrent.y = e.touches[0].clientY;
+        let dy = pCurrent.y - pStart.y;
+        dy > 0 && 0 === contactsListEl.scrollTop && (contactsListEl.style.transform = `translateY(${Math.min(dy / 2, 80)}px)`);
+      }, {
+        passive: !0
+      }), contactsListEl.addEventListener("touchend", e => {
+        if (!pIsPulling) return;
+        pIsPulling = !1;
+        let dy = pCurrent.y - pStart.y;
+        contactsListEl.classList.add("pull-to-refresh"), contactsListEl.style.transform = "",
+          dy > 120 && 0 === contactsListEl.scrollTop && softReloadNetwork();
+      }), window.addEventListener("DOMContentLoaded", initTheme), window.addEventListener("DOMContentLoaded", _processContactIntent),
+      window.addEventListener("hashchange", _processContactIntent);
   </script>
 </body>
 
