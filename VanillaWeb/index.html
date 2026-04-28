@@ -7925,6 +7925,31 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     .pull-to-refresh {
       transition: transform 0.2s ease-out
     }
+
+    /* 自定义优雅的滚动条，代替粗糙的系统默认滚动条 */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 4px
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.8)
+    }
+
+    /* 针对 Firefox 的精简设置 */
+    .custom-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(156, 163, 175, 0.5) transparent
+    }
   </style>
 </head>
 
@@ -7934,7 +7959,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DGCHAT 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.86</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.87</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8016,8 +8041,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           </div>
         </div>
         <div class="flex space-x-1.5 shrink-0 items-center">
-          <button onclick="startQrScan()" title="扫码添加" class="p-1.5 text-gray-500 hover:text-blue-600 transition active:scale-95"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+          <button onclick="startQrScan()" title="扫一扫" class="p-1.5 text-gray-500 hover:text-blue-600 transition active:scale-95"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2M6 12h12"></path>
             </svg></button>
           <button onclick="softReloadNetwork()" title="软重连网络" class="p-1.5 text-gray-500 hover:text-green-600 transition active:scale-95"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -8109,7 +8134,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         </div>
       </div>
 
-      <div id="message-list" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar hidden z-0"></div>
+      <div id="message-list" class="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar hidden z-0"></div>
 
       <div id="chat-input-area" class="p-3 md:p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 hidden z-10 shrink-0 pb-safe relative">
 
@@ -8209,7 +8234,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             <div id="peer-modal-pubkey-actions" class="flex items-center shrink-0">
               <button onclick="showQrCode('公钥二维码', document.getElementById('peer-modal-pubkey').innerText, document.getElementById('peer-modal-name').innerText)" class="ml-2 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="显示二维码">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 19h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h6v3h-6v-3zm0-3h3v3h-3v-3zm3 0h3v3h-3v-3z"></path>
                 </svg>
               </button>
               <button onclick="copyText(document.getElementById('peer-modal-pubkey').innerText); alert('ID 已复制！')" class="ml-1 text-blue-500 hover:text-blue-700 shrink-0 p-1 bg-white dark:bg-gray-900 rounded shadow-sm border border-gray-200 dark:border-gray-700 active:scale-95" title="复制公钥">
@@ -8324,7 +8349,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             <div class="flex">
               <input type="text" id="my-npub-display" readonly class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-gray-100 dark:bg-gray-950 text-gray-500 dark:text-gray-400 font-mono text-xs overflow-hidden outline-none">
               <button onclick="copyText(document.getElementById('my-npub-display').value); alert('公钥已复制！');" class="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 text-sm border border-l-0 border-r-0 border-gray-300 dark:border-gray-600 transition font-medium">复制</button>
-              <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value, document.getElementById('edit-name').value || '我')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg text-lg border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium">📱</button>
+              <button onclick="showQrCode('公钥二维码', document.getElementById('my-npub-display').value, document.getElementById('edit-name').value || '我')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 rounded-r-lg flex items-center justify-center border border-l-0 border-gray-300 dark:border-gray-600 transition font-medium" title="显示二维码">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h6v3h-6v-3zm0-3h3v3h-3v-3zm3 0h3v3h-3v-3z"></path>
+                </svg>
+              </button>
             </div>
             <button onclick="let url = window.location.origin + window.location.pathname + '#contact=' + document.getElementById('my-npub-display').value; copyText(url); alert('✅ 专属链接已复制！\n\n您可以将此链接挂在个人主页或发到微信群，任何人点击即可一键拉起 DGCHAT 并在浏览器向您打招呼。');" class="mt-2 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 py-2.5 rounded-lg text-xs font-bold transition border border-indigo-200 dark:border-indigo-800 shadow-sm flex items-center justify-center active:scale-95">
               🔗 复制「联系我」专属网页链接 (一键拉起聊天)
@@ -8408,7 +8437,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               <input type="password" id="my-nsec-display" readonly value="••••••••••••••" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-full border border-gray-300 dark:border-gray-600 rounded-l-lg p-2 bg-red-50 text-red-600 font-mono text-xs overflow-hidden outline-none">
               <button onclick="actionWithPasswordVerification('toggleKey')" id="btn-toggle-key" class="bg-gray-100 dark:bg-gray-950 hover:bg-gray-200 text-gray-700 dark:text-gray-200 px-3 text-sm border-t border-b border-gray-300 dark:border-gray-600 transition font-medium">显示</button>
               <button onclick="actionWithPasswordVerification('copyKey')" class="bg-red-500 hover:bg-red-600 text-white px-3 text-sm border border-l-0 border-red-500 transition font-medium whitespace-nowrap">复制</button>
-              <button onclick="actionWithPasswordVerification('showQrKey')" class="bg-red-600 hover:bg-red-700 text-white px-3 rounded-r-lg text-lg border border-l-0 border-red-500 transition font-medium whitespace-nowrap">📱</button>
+              <button onclick="actionWithPasswordVerification('showQrKey')" class="bg-red-600 hover:bg-red-700 text-white px-3 rounded-r-lg flex items-center justify-center border border-l-0 border-red-500 transition font-medium whitespace-nowrap" title="显示二维码">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h6v3h-6v-3zm0-3h3v3h-3v-3zm3 0h3v3h-3v-3z"></path>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -8603,7 +8636,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       </button>
       <div class="mt-4 flex justify-end space-x-3">
         <button onclick="closeInviteCodeModal()" class="px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-950 rounded-lg transition">关闭</button>
-        <button onclick="showQrCode('群组邀请码', document.getElementById('invite-code-display').value, document.getElementById('invite-code-display').getAttribute('data-gname') || '群聊')" class="px-4 py-2.5 text-xl font-medium bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition shadow-sm active:scale-95" title="显示二维码">📱</button>
+        <button onclick="showQrCode('群组邀请码', document.getElementById('invite-code-display').value, document.getElementById('invite-code-display').getAttribute('data-gname') || '群聊')" class="px-4 py-2.5 flex items-center justify-center bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition shadow-sm active:scale-95" title="显示二维码">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h6v3h-6v-3zm0-3h3v3h-3v-3zm3 0h3v3h-3v-3z"></path>
+          </svg>
+        </button>
         <button onclick="copyText(document.getElementById('invite-code-display').value); alert('邀请码已复制！'); closeInviteCodeModal();" class="px-5 py-2.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-95">复制邀请码</button>
       </div>
     </div>
@@ -9604,8 +9641,13 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
     }
 
     async function manualLock() {
-      pubKeyHex && (_syncCacheTimer && clearTimeout(_syncCacheTimer), await executeCacheSave(),
-        sessionStorage.setItem("dage_session_pub", pubKeyHex), window.location.reload());
+      if (!pubKeyHex) return;
+      isLocked = !0;
+      let acc = accounts.find(a => a.pubkey === pubKeyHex);
+      acc && (document.getElementById("lock-name").innerText = acc.name || "已锁定", document.getElementById("lock-avatar").innerHTML = acc.picture ? `<img src="${formatAvatarUrl(acc.picture)}" class="w-full h-full object-cover">` : acc.name ? escapeHTML(acc.name.substring(0, 1)) : "锁"),
+        document.getElementById("lock-screen").classList.remove("hidden"), document.getElementById("lock-pwd").value = "",
+        setTimeout(() => document.getElementById("lock-pwd").focus(), 100), _syncCacheTimer && clearTimeout(_syncCacheTimer),
+        await executeCacheSave(), privKeyHex = null, sessionStorage.removeItem("dage_session_priv");
     }
 
     async function getLegacyAesKey(password) {
@@ -9848,7 +9890,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         if (!acc) throw new Error("本地账号数据异常丢失");
         privKeyHex = await aesDecrypt(acc.encPrivKey, pwd), acc.encPrivKey.startsWith("02") || (acc.encPrivKey = await aesEncrypt(privKeyHex, pwd),
             localStorage.setItem("dage_accounts", JSON.stringify(accounts))), isLocked = !1,
-          sessionStorage.setItem("dage_session_pub", pubKeyHex), document.getElementById("lock-screen").classList.add("hidden"),
+          sessionStorage.setItem("dage_session_pub", pubKeyHex), sessionStorage.setItem("dage_session_priv", privKeyHex),
+          localStorage.setItem("lastActive_" + pubKeyHex, Date.now().toString()), document.getElementById("lock-screen").classList.add("hidden"),
           document.getElementById("lock-pwd").value = "", await initializeApp();
       } catch (e) {
         console.error(e), alert("解锁失败！\n真实原因：" + (e.message || e)), document.getElementById("lock-pwd").value = "";
@@ -11495,7 +11538,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               fallbackChar = String(p.name || (isMe ? "我" : "?")).substring(0, 1);
             avatarHtml = picUrl ? `<img src="${picUrl}" class="w-10 h-10 rounded-full object-cover shadow-sm shrink-0 cursor-pointer hover:opacity-80 transition active:scale-95" onclick="showPeerProfileModal('${m.sender}')">` : `<div class="w-10 h-10 rounded-full ${isMe ? "bg-blue-500" : "bg-gray-400"} flex items-center justify-center text-white text-sm font-bold shadow-sm shrink-0 cursor-pointer hover:opacity-80 transition active:scale-95" onclick="showPeerProfileModal('${m.sender}')">${escapeHTML(fallbackChar)}</div>`;
           }
-          let bubbleHtml = `\n                  <div class="flex ${isMe ? "flex-row-reverse" : "flex-row"} w-full items-start mb-1 mt-1">\n                      <div class="${isMe ? "ml-2" : "mr-2"} pt-1 no-select shrink-0">\n                          ${avatarHtml}\n                      </div>\n                      <div class="flex flex-col flex-1 ${alignClass} min-w-0 no-select"\n                          ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                          ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                          oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                          ${senderNameHtml}\n                          <div class="max-w-[90%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                              ${quoteHtml}\n                              <div class="text-[15px] whitespace-pre-wrap bubble-text leading-relaxed max-h-[50vh] overflow-y-auto no-scrollbar">${contentHtml}</div>\n                              <div class="text-[11px] text-right mt-1.5 ${timeColorClass} select-none flex items-center justify-end space-x-1">\n                                  <span class="cursor-pointer hover:opacity-80 transition-opacity"\n                                        data-short="${encodeURIComponent(justTimeShort)}"\n                                        data-full="${encodeURIComponent(justTimeFull)}"\n                                        onclick="if(isSelectMode) return; event.stopPropagation(); let s = decodeURIComponent(this.getAttribute('data-short')); let f = decodeURIComponent(this.getAttribute('data-full')); this.innerText = this.innerText === s ? f : s;">\n                                      ${justTimeShort}\n                                  </span>\n                                  <span>${encIcon}</span>\n                                  ${statusIcon}\n                              </div>\n                          </div>\n                      </div>\n                  </div>\n              `;
+          let bubbleHtml = `\n                  <div class="flex ${isMe ? "flex-row-reverse" : "flex-row"} w-full items-start mb-1 mt-1">\n                      <div class="${isMe ? "ml-2" : "mr-2"} pt-1 no-select shrink-0">\n                          ${avatarHtml}\n                      </div>\n                      <div class="flex flex-col flex-1 ${alignClass} min-w-0 no-select"\n                          ontouchstart="handleTouchStart(event, '${m.id}', ${isMe})"\n                          ontouchend="handleTouchEnd()" ontouchmove="handleTouchMove()" ontouchcancel="handleTouchMove()"\n                          oncontextmenu="handleRightClick(event, '${m.id}', ${isMe})">\n                          ${senderNameHtml}\n                          <div class="max-w-[90%] md:max-w-md rounded-2xl p-3 shadow-sm ${bubbleStyleClass}">\n                              ${quoteHtml}\n                              <div class="text-[15px] whitespace-pre-wrap bubble-text leading-relaxed max-h-[50vh] overflow-y-auto custom-scrollbar">${contentHtml}</div>\n                              <div class="text-[11px] text-right mt-1.5 ${timeColorClass} select-none flex items-center justify-end space-x-1">\n                                  <span class="cursor-pointer hover:opacity-80 transition-opacity"\n                                        data-short="${encodeURIComponent(justTimeShort)}"\n                                        data-full="${encodeURIComponent(justTimeFull)}"\n                                        onclick="if(isSelectMode) return; event.stopPropagation(); let s = decodeURIComponent(this.getAttribute('data-short')); let f = decodeURIComponent(this.getAttribute('data-full')); this.innerText = this.innerText === s ? f : s;">\n                                      ${justTimeShort}\n                                  </span>\n                                  <span>${encIcon}</span>\n                                  ${statusIcon}\n                              </div>\n                          </div>\n                      </div>\n                  </div>\n              `;
           wrapper.innerHTML = selectHtml + bubbleHtml, list.appendChild(wrapper);
         }), isLocateMode) {
         let targetIdx = msgs.findIndex(m => m.id === targetMsgId);
@@ -12552,11 +12595,22 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if (file) {
         if (file.size > 10485760) return alert("❌ 图片体积过大！出于内存保护，二维码扫描最大仅支持 10MB 的图片。"),
           void(event.target.value = "");
-        html5QrCode || (html5QrCode = new Html5Qrcode("qr-reader")), html5QrCode.scanFile(file, !0).then(decodedText => {
-          stopQrScan(), handleScanResult(decodedText);
-        }).catch(err => {
-          alert("❌ 无法从该图片中识别到二维码！");
-        }), event.target.value = "";
+
+        function doScan(targetFile) {
+          html5QrCode || (html5QrCode = new Html5Qrcode("qr-reader")), html5QrCode.scanFile(targetFile, !0).then(decodedText => {
+            stopQrScan(), handleScanResult(decodedText);
+          }).catch(err => {
+            targetFile === file ? processImageFile(file, 800, .8, function(b64) {
+              fetch("data:image/jpeg;base64," + b64).then(res => res.blob()).then(blob => {
+                doScan(new File([blob], "compressed.jpg", {
+                  type: "image/jpeg"
+                }));
+              }).catch(() => alert("❌ 无法从该图片中识别到二维码！"));
+            }) : alert("❌ 无法从该图片中识别到二维码！");
+          });
+        }
+        html5QrCode && html5QrCode.getState && 2 === html5QrCode.getState() ? html5QrCode.stop().then(() => doScan(file)).catch(() => doScan(file)) : doScan(file),
+          event.target.value = "";
       }
     }
 
@@ -12641,7 +12695,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           }]));
         }
     }, 3e4), document.addEventListener("visibilitychange", () => {
-      if ("visible" === document.visibilityState && pubKeyHex && !isLocked) {
+      if ("hidden" === document.visibilityState && pubKeyHex && !isLocked && (_syncCacheTimer && clearTimeout(_syncCacheTimer),
+          executeCacheSave()), "visible" === document.visibilityState && pubKeyHex && !isLocked) {
         initRelayConnection();
         let safeNow = Math.floor(Date.now() / 1e3) - 600,
           ghostGids = Object.keys(groups).filter(gid => 1 === groups[gid].type),
