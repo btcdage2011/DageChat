@@ -7959,7 +7959,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DGCHAT 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.87</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.88</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -7998,7 +7998,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">私钥 (nsec / hex)</label>
           <div class="flex">
             <input type="password" id="sk-input" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 block w-full border border-gray-300 dark:border-gray-600 rounded-l-lg shadow-sm py-3 px-4 focus:ring-2 focus:ring-blue-500 font-mono text-base outline-none" placeholder="输入现有私钥...">
-            <button onclick="startQrScan('sk-input')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 rounded-r-lg text-xl border border-l-0 border-gray-300 dark:border-gray-600 transition shadow-sm active:scale-95" title="扫码输入">📷</button>
+            <button onclick="startQrScan('sk-input')" class="bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 rounded-r-lg flex items-center justify-center border border-l-0 border-gray-300 dark:border-gray-600 transition shadow-sm active:scale-95" title="扫码输入">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2M6 12h12"></path>
+              </svg>
+            </button>
           </div>
         </div>
         <button onclick="importAccount()" class="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition shadow-md font-medium active:scale-95">加密导入本机</button>
@@ -8549,10 +8553,11 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           <button onclick="addRelayNode()" class="bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition active:scale-95 shrink-0">添加并连接</button>
         </div>
         <div class="flex items-center justify-between mt-2">
-          <p class="text-[11px] text-gray-400 mr-2">提示：连接失败请点列表中的“信任证书”。</p>
+          <p class="text-[11px] text-gray-400 mr-2">提示：连接失败请点“信任证书”。</p>
           <div class="flex space-x-2 shrink-0">
-            <button onclick="copyText(currentRelayUrls.filter(u => !localRelayBlocklist.has(u)).join(', ')); alert('所有本地有效节点已复制！')" class="px-3 py-1.5 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 text-[11px] font-bold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition active:scale-95 shadow-sm">📄 复制列表</button>
-            <button onclick="forceSyncRelaysToCloud()" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 text-[11px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition active:scale-95 shadow-sm">🔄 以当前列表覆盖云端</button>
+            <button onclick="resetDefaultRelays()" class="px-2 py-1.5 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-[10px] sm:text-[11px] font-bold rounded-lg border border-red-200 dark:border-red-800 hover:bg-red-100 transition active:scale-95 shadow-sm">🔁 还原默认</button>
+            <button onclick="copyText(currentRelayUrls.filter(u => !localRelayBlocklist.has(u)).join(', ')); alert('所有本地有效节点已复制！')" class="px-2 py-1.5 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 text-[10px] sm:text-[11px] font-bold rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition active:scale-95 shadow-sm">📄 复制</button>
+            <button onclick="forceSyncRelaysToCloud()" class="px-2 py-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 text-[10px] sm:text-[11px] font-bold rounded-lg border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition active:scale-95 shadow-sm">🔄 覆盖云端</button>
           </div>
         </div>
       </div>
@@ -9647,7 +9652,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       acc && (document.getElementById("lock-name").innerText = acc.name || "已锁定", document.getElementById("lock-avatar").innerHTML = acc.picture ? `<img src="${formatAvatarUrl(acc.picture)}" class="w-full h-full object-cover">` : acc.name ? escapeHTML(acc.name.substring(0, 1)) : "锁"),
         document.getElementById("lock-screen").classList.remove("hidden"), document.getElementById("lock-pwd").value = "",
         setTimeout(() => document.getElementById("lock-pwd").focus(), 100), _syncCacheTimer && clearTimeout(_syncCacheTimer),
-        await executeCacheSave(), privKeyHex = null, sessionStorage.removeItem("dage_session_priv");
+        await executeCacheSave();
+      for (let url in wsPool) wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close());
+      wsPool = {};
+      for (let url in reconnectTimers) clearTimeout(reconnectTimers[url]);
+      reconnectTimers = {}, outboxQueue = [], isSendingQueue = !1;
+      let statusDot = document.getElementById("relay-status");
+      statusDot && (statusDot.className = "w-2 h-2 rounded-full bg-red-500 mr-1.5 shadow-sm shrink-0"),
+        privKeyHex = null, sessionStorage.removeItem("dage_session_priv");
     }
 
     async function getLegacyAesKey(password) {
@@ -10086,7 +10098,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     async function initializeApp() {
       requestNotificationPermission(), document.getElementById("login-screen").classList.add("hidden"),
-        document.getElementById("app-screen").classList.remove("hidden"), window.innerWidth >= 768 && (document.getElementById("welcome-area").style.display = "",
+        document.getElementById("app-screen").classList.remove("hidden"), !currentChatPk && window.innerWidth >= 768 && (document.getElementById("welcome-area").style.display = "",
           document.getElementById("welcome-area").classList.remove("hidden")), document.getElementById("my-npub-display").value = nt.nip19.npubEncode(pubKeyHex),
         currentRelayUrl = localStorage.getItem(`dage_relay_${pubKeyHex}`) || "wss://chat.boom.money",
         lockTimeMins = parseInt(localStorage.getItem(`dage_locktime_${pubKeyHex}`) || "60"),
@@ -10149,7 +10161,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       localRelayBlocklist = savedRelayBlock ? new Set(JSON.parse(savedRelayBlock).map(u => "string" == typeof u ? u.replace(/\/+$/, "") : u)) : new Set,
         renderContacts(), initRelayConnection(), setTimeout(() => {
           isCloudSyncing = !1;
-        }, 5e3);
+        }, 5e3), currentChatPk && (updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
+          document.getElementById("welcome-area").classList.add("hidden"), renderMessages(!0));
       let pendingContact = sessionStorage.getItem("dage_pending_contact");
       pendingContact && (sessionStorage.removeItem("dage_pending_contact"), setTimeout(() => {
         pendingContact === pubKeyHex || contacts.includes(pendingContact) || groups[pendingContact] ? selectContact(pendingContact) : showPeerProfileModal(pendingContact);
@@ -10342,6 +10355,19 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       localRelayBlocklist.delete(url), localStorage.setItem(`dage_relay_block_${pubKeyHex}`, JSON.stringify(Array.from(localRelayBlocklist))),
         currentRelayUrls.includes(url) || (currentRelayUrls.push(url), localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")),
           initRelayConnection()), renderRelayManagerList();
+    }
+
+    function resetDefaultRelays() {
+      if (confirm("⚠️ 确定要还原为初始默认节点吗？\n\n此操作将清空当前的节点列表和本地黑名单，并恢复为系统默认的 3 个推荐节点。")) {
+        if (currentRelayUrls = ["wss://relay.damus.io", "wss://relay.primal.net", "wss://chat.boom.money"],
+          localRelayBlocklist.clear(), pubKeyHex) localStorage.setItem(`dage_relay_block_${pubKeyHex}`, "[]"),
+          localStorage.setItem(`dage_relay_${pubKeyHex}`, currentRelayUrls.join(",")), initRelayConnection();
+        else {
+          let countEl = document.getElementById("pre-login-relay-count");
+          countEl && (countEl.innerText = currentRelayUrls.length);
+        }
+        renderRelayManagerList(), alert("✅ 已还原为默认节点！\n\n(提示：若要让云端也同步此修改，请随后点击“覆盖云端”按钮)");
+      }
     }
 
     async function forceSyncRelaysToCloud() {
