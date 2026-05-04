@@ -7959,7 +7959,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DGCHAT 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.89</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.90</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -8432,7 +8432,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
           <div class="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
             <label class="text-xs font-medium text-gray-700 dark:text-gray-200">防窥锁屏时间 (分钟)</label>
-            <input type="number" id="edit-locktime" min="1" max="600" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-20 border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center">
+            <input type="number" id="edit-locktime" min="1" max="600000" class="dark:bg-gray-800 dark:text-white dark:border-gray-600 w-24 border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono text-center">
           </div>
 
           <div>
@@ -10181,11 +10181,14 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
           relayStates[url] || (relayStates[url] = {
             status: 0,
             ping: -1,
-            startTs: 0
+            startTs: 0,
+            retryCount: 0,
+            cooldownUntil: 0
           });
         }), document.getElementById("current-relay-display").innerText = currentRelayUrls.length + " 个并发节点",
         currentRelayUrls.forEach(url => {
-          if (!wsPool[url] || wsPool[url].readyState !== WebSocket.OPEN) {
+          if (relayStates[url] && relayStates[url].cooldownUntil && relayStates[url].cooldownUntil > Date.now()) relayStates[url].status = 3;
+          else if (!wsPool[url] || wsPool[url].readyState !== WebSocket.OPEN) {
             wsPool[url] && (wsPool[url].onclose = null, wsPool[url].close()), reconnectTimers[url] && (clearTimeout(reconnectTimers[url]),
               delete reconnectTimers[url]);
             try {
@@ -10193,8 +10196,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
               let ws = new WebSocket(url);
               wsPool[url] = ws, ws.onopen = () => {
                 relayStates[url].status = 2, relayStates[url].ping = Date.now() - relayStates[url].startTs,
-                  console.log(`✅ [Relay] 已连接: ${url} (${relayStates[url].ping}ms)`), updateRelayStatusUI(),
-                  reconnectTimers[url] && clearInterval(reconnectTimers[url]);
+                  relayStates[url].retryCount = 0, relayStates[url].cooldownUntil = 0, console.log(`✅ [Relay] 已连接: ${url} (${relayStates[url].ping}ms)`),
+                  updateRelayStatusUI(), reconnectTimers[url] && clearInterval(reconnectTimers[url]);
                 let ghostGids = Object.keys(groups).filter(gid => 1 === groups[gid].type),
                   normalGids = Object.keys(groups).filter(gid => 0 === groups[gid].type),
                   filterBase = {
@@ -10241,8 +10244,15 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                   window._ackListeners && window._ackListeners[eventId] && window._ackListeners[eventId](url, isSuccess, reason);
                 }
               }, ws.onclose = () => {
-                console.warn(`⚠️ [Relay] 断开连接: ${url}`), relayStates[url].status = 0, relayStates[url].ping = -1,
+                if (console.warn(`⚠️ [Relay] 断开连接: ${url}`), relayStates[url].status = 0, relayStates[url].ping = -1,
+                  relayStates[url].retryCount = (relayStates[url].retryCount || 0) + 1, relayStates[url].retryCount >= 3) return console.warn(`🛑 [断路器] Relay ${url} 连续失败 3 次，进入 5 分钟休眠冷却`),
+                  relayStates[url].cooldownUntil = Date.now() + 3e5, relayStates[url].status = 3,
                   updateRelayStatusUI(), reconnectTimers[url] && clearTimeout(reconnectTimers[url]),
+                  void(reconnectTimers[url] = setTimeout(() => {
+                    isLocked || (relayStates[url].retryCount = 0, relayStates[url].cooldownUntil = 0,
+                      initRelayConnection());
+                  }, 3e5));
+                updateRelayStatusUI(), reconnectTimers[url] && clearTimeout(reconnectTimers[url]),
                   reconnectTimers[url] = setTimeout(() => {
                     isLocked || (wsPool[url] && (wsPool[url].onclose = null, delete wsPool[url]), initRelayConnection());
                   }, 5e3 + 2e3 * Math.random());
@@ -10272,20 +10282,23 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       if (list && (list.innerHTML = "", currentRelayUrls.forEach(url => {
           let state = relayStates[url] || {
               status: 0,
-              ping: -1
+              ping: -1,
+              retryCount: 0
             },
             statusText = "待登录",
             statusColor = "text-gray-400",
-            pingText = "--";
+            pingText = "--",
+            extraActionBtn = "";
           pubKeyHex && (0 === state.status ? (statusText = "断开", statusColor = "text-red-500") : 1 === state.status ? (statusText = "连接中",
-            statusColor = "text-yellow-500") : 2 === state.status && (statusText = "在线", statusColor = "text-green-500",
-            pingText = state.ping > 0 ? `${state.ping}ms` : "--"));
+            statusColor = "text-yellow-500") : 2 === state.status ? (statusText = "在线", statusColor = "text-green-500",
+            pingText = state.ping > 0 ? `${state.ping}ms` : "--") : 3 === state.status && (statusText = "冷却休眠",
+            statusColor = "text-orange-500", extraActionBtn = `<button data-url="${escapeHTML(url)}" onclick="window.forceRetryRelay(this.getAttribute('data-url'))" class="ml-2 px-1.5 py-0.5 bg-orange-50 text-orange-600 border border-orange-200 rounded text-[10px] hover:bg-orange-100 transition shadow-sm active:scale-95 font-bold">立刻重试</button>`));
           let safeUrl = escapeHTML(url),
             trustHtml = "";
           pubKeyHex && 0 === state.status && url.startsWith("wss://") && (trustHtml = `<a href="${escapeHTML(url.replace("wss://", "https://"))}" target="_blank" rel="noopener noreferrer" class="ml-3 text-[11px] text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded hover:bg-red-100 transition whitespace-nowrap shadow-sm font-bold">⚠️ 信任证书</a>`);
           let div = document.createElement("div");
           div.className = "flex items-center justify-between p-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:bg-gray-800 transition rounded-lg",
-            div.innerHTML = `\n                    <div class="flex-1 min-w-0 pr-2">\n                        <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate flex items-center">\n                            ${safeUrl} ${trustHtml}\n                        </div>\n                        <div class="text-xs mt-1 flex items-center space-x-3">\n                            <span class="${statusColor} font-bold">${statusText}</span>\n                            <span class="text-gray-400">延迟: ${pingText}</span>\n                        </div>\n                    </div>\n                    <div class="flex space-x-1 shrink-0">\n                        <button data-url="${safeUrl}" onclick="copyText(this.getAttribute('data-url')); alert('节点地址已复制！')" class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition active:scale-95" title="复制该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>\n                        </button>\n                        <button data-url="${safeUrl}" onclick="removeRelayNode(this.getAttribute('data-url'))" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition active:scale-95" title="删除该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                        </button>\n                    </div>\n                `,
+            div.innerHTML = `\n                    <div class="flex-1 min-w-0 pr-2">\n                        <div class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate flex items-center">\n                            ${safeUrl} ${trustHtml}\n                        </div>\n                        <div class="text-xs mt-1 flex items-center space-x-3">\n                            <span class="${statusColor} font-bold flex items-center">${statusText}${extraActionBtn}</span>\n                            <span class="text-gray-400">延迟: ${pingText}</span>\n                        </div>\n                    </div>\n                    <div class="flex space-x-1 shrink-0">\n                        <button data-url="${safeUrl}" onclick="copyText(this.getAttribute('data-url')); alert('节点地址已复制！')" class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition active:scale-95" title="复制该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>\n                        </button>\n                        <button data-url="${safeUrl}" onclick="removeRelayNode(this.getAttribute('data-url'))" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition active:scale-95" title="删除该节点">\n                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>\n                        </button>\n                    </div>\n                `,
             list.appendChild(div);
         }), pubKeyHex && localRelayBlocklist.size > 0)) {
         let divTitle = document.createElement("div");
@@ -12020,7 +12033,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 
     async function saveProfile() {
       let timeVal = parseInt(document.getElementById("edit-locktime").value);
-      (isNaN(timeVal) || timeVal < 1) && (timeVal = 1), timeVal > 600 && (timeVal = 600),
+      (isNaN(timeVal) || timeVal < 1) && (timeVal = 1), timeVal > 6e5 && (timeVal = 6e5),
         lockTimeMins = timeVal, localStorage.setItem("dage_locktime_" + pubKeyHex, lockTimeMins);
       let isNotifyEnabled = document.getElementById("edit-enable-notify").checked;
       localStorage.setItem("dage_enable_sys_notify_" + pubKeyHex, isNotifyEnabled ? "1" : "0"),
@@ -12686,6 +12699,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       wsPool = {};
       for (let url in reconnectTimers) clearTimeout(reconnectTimers[url]);
       reconnectTimers = {};
+      for (let url in relayStates) relayStates[url] && (relayStates[url].retryCount = 0,
+        relayStates[url].cooldownUntil = 0);
       let statusDot = document.getElementById("relay-status");
       statusDot && (statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 mr-1.5 shadow-sm shrink-0");
       let displayEl = document.getElementById("current-relay-display"),
@@ -12732,7 +12747,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       }, 5e3);
     }
 
-    setInterval(() => {
+    window.forceRetryRelay = function(url) {
+      pubKeyHex && !isLocked && (relayStates[url] && (relayStates[url].retryCount = 0,
+        relayStates[url].cooldownUntil = 0, relayStates[url].status = 0), wsPool[url] && (wsPool[url].onclose = null,
+        wsPool[url].close(), delete wsPool[url]), reconnectTimers[url] && (clearTimeout(reconnectTimers[url]),
+        delete reconnectTimers[url]), initRelayConnection(), renderRelayManagerList());
+    }, setInterval(() => {
       if (pubKeyHex && !isLocked)
         for (let url in wsPool) {
           let ws = wsPool[url];
@@ -12874,7 +12894,10 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         contactsListEl.classList.add("pull-to-refresh"), contactsListEl.style.transform = "",
           dy > 120 && 0 === contactsListEl.scrollTop && softReloadNetwork();
       }), window.addEventListener("DOMContentLoaded", initTheme), window.addEventListener("DOMContentLoaded", _processContactIntent),
-      window.addEventListener("hashchange", _processContactIntent);
+      window.addEventListener("hashchange", _processContactIntent), window.addEventListener("online", () => {
+        void 0 !== pubKeyHex && pubKeyHex && !isLocked && (console.log("📡 [网络恢复] 操作系统报告网络已连接，触发全局休眠唤醒..."),
+          softReloadNetwork());
+      });
   </script>
 </body>
 
