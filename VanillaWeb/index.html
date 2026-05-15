@@ -7959,7 +7959,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   <div id="login-screen" class="w-full h-full md:h-auto md:max-w-md bg-white dark:bg-gray-900 md:rounded-xl shadow-lg p-6 md:p-8 flex flex-col justify-center hidden z-50">
     <div class="max-w-sm w-full mx-auto" id="account-list-area">
       <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-100 mb-1">DGCHAT 🔐</h2>
-      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.90</div>
+      <div class="text-center text-xs text-blue-500 font-mono mb-6 font-bold tracking-widest">v0.1.91</div>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 text-center">选择账号登录</p>
 
       <div id="saved-accounts-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto no-scrollbar">
@@ -9337,7 +9337,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             kinds: [3],
             authors: [pubKeyHex],
             limit: 1
-          }])), await new Promise(r => setTimeout(r, 2e3)), broadcastToRelays(JSON.stringify(["CLOSE", subId]));
+          }])), await new Promise(r => setTimeout(r, 4e3)), broadcastToRelays(JSON.stringify(["CLOSE", subId]));
         } catch (e) {
           console.error("Auto merge pre-sync failed", e);
         }
@@ -10141,7 +10141,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         for (let pk in messages) window._msgSnapshots[pk] = JSON.stringify(messages[pk]);
         delete window._oldMonolithicCache;
       } else {
-        let allKnownPks = new Set([...contacts, ...Object.keys(groups), ...pinnedChats, ...hiddenChats, pubKeyHex]);
+        let allKnownPks = new Set([...contacts, ...Object.keys(groups), ...pinnedChats, ...hiddenChats, ...Object.keys(unreadCounts), ...Object.keys(lastReadWatermarks), ...Object.keys(clearedChatTimestamps), pubKeyHex]);
         for (let pk of allKnownPks) {
           let msgs = await loadEncryptedData("msg_" + pk, null);
           msgs && (messages[pk] = msgs, window._msgSnapshots[pk] = JSON.stringify(msgs)),
@@ -10161,7 +10161,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       localRelayBlocklist = savedRelayBlock ? new Set(JSON.parse(savedRelayBlock).map(u => "string" == typeof u ? u.replace(/\/+$/, "") : u)) : new Set,
         renderContacts(), initRelayConnection(), setTimeout(() => {
           isCloudSyncing = !1;
-        }, 5e3), currentChatPk && (updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
+        }, 8e3), currentChatPk && (updateChatHeader(), document.getElementById("welcome-area").style.display = "none",
           document.getElementById("welcome-area").classList.add("hidden"), renderMessages(!0));
       let pendingContact = sessionStorage.getItem("dage_pending_contact");
       pendingContact && (sessionStorage.removeItem("dage_pending_contact"), setTimeout(() => {
@@ -10201,7 +10201,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
                 let ghostGids = Object.keys(groups).filter(gid => 1 === groups[gid].type),
                   normalGids = Object.keys(groups).filter(gid => 0 === groups[gid].type),
                   filterBase = {
-                    limit: 50
+                    limit: 200
                   };
                 const req = ["REQ", "sub-" + Date.now(), {
                   kinds: [0, 5],
@@ -10408,7 +10408,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
             kinds: [3],
             authors: [pubKeyHex],
             limit: 1
-          }])), await new Promise(resolve => setTimeout(resolve, 3e3)), broadcastToRelays(JSON.stringify(["CLOSE", subId])),
+          }])), await new Promise(resolve => setTimeout(resolve, 5e3)), broadcastToRelays(JSON.stringify(["CLOSE", subId])),
           btnElement.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 正在加密上传...',
           await syncBackupToCloud(), btnElement.innerHTML = "✅ 合并上传成功！", renderContacts();
       } catch (e) {
@@ -12714,7 +12714,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
       let msgs = messages[chatPk] || [];
       if (0 === msgs.length) return;
       let oldestTs = msgs[0].time;
-      if (oldestTs < Math.floor(Date.now() / 1e3) - 15552e3 && !confirm("⚠️ 提示：您正在向网络深度拉取超过 6 个月前的远古聊天记录。\n\n为保证设备性能，极早期的本地单条删除状态（墓碑）可能已脱离冷热存储区被释放。继续拉取可能会导致某些被删消息重新出现。\n\n是否继续拉取？")) return;
+      if (window._historyCursors[chatPk] && window._historyCursors[chatPk] < oldestTs && (oldestTs = window._historyCursors[chatPk]),
+        window._historyCursors[chatPk] = oldestTs - 259200, oldestTs < Math.floor(Date.now() / 1e3) - 15552e3 && !confirm("⚠️ 提示：您正在向网络深度拉取超过 6 个月前的远古聊天记录。\n\n为保证设备性能，极早期的本地单条删除状态（墓碑）可能已脱离冷热存储区被释放。继续拉取可能会导致某些被删消息重新出现。\n\n是否继续拉取？")) return;
       let isGroup = !!groups[chatPk],
         isGhost = isGroup && 1 === groups[chatPk].type,
         subId = "history-" + chatPk.substring(0, 6) + "-" + Date.now(),
@@ -12723,28 +12724,28 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         kinds: [1059],
         "#p": [chatPk],
         until: oldestTs,
-        limit: 50
+        limit: 300
       }) : req.push({
         kinds: [5, 42],
         "#g": [chatPk],
         until: oldestTs,
-        limit: 50
+        limit: 300
       }) : (req.push({
         kinds: [4, 5, 1059],
         "#p": [pubKeyHex],
         until: oldestTs,
-        limit: 50
+        limit: 300
       }), req.push({
         kinds: [4, 5],
         authors: [pubKeyHex],
         "#p": [chatPk],
         until: oldestTs,
-        limit: 50
+        limit: 300
       })), broadcastToRelays(JSON.stringify(req));
       let btn = document.getElementById("load-more-btn-" + chatPk);
-      btn && (btn.innerText = "⏳ 正在拉取中继网络..."), setTimeout(() => {
+      btn && (btn.innerText = "⏳ 正在深度扫描中继网络..."), setTimeout(() => {
         broadcastToRelays(JSON.stringify(["CLOSE", subId])), btn && (btn.innerText = "⬆️ 再次向网络获取更早的消息");
-      }, 5e3);
+      }, 6e3);
     }
 
     window.forceRetryRelay = function(url) {
@@ -12752,7 +12753,7 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
         relayStates[url].cooldownUntil = 0, relayStates[url].status = 0), wsPool[url] && (wsPool[url].onclose = null,
         wsPool[url].close(), delete wsPool[url]), reconnectTimers[url] && (clearTimeout(reconnectTimers[url]),
         delete reconnectTimers[url]), initRelayConnection(), renderRelayManagerList());
-    }, setInterval(() => {
+    }, window._historyCursors = window._historyCursors || {}, setInterval(() => {
       if (pubKeyHex && !isLocked)
         for (let url in wsPool) {
           let ws = wsPool[url];
